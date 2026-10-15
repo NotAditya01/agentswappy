@@ -10,18 +10,24 @@ Forked from the agentmaxxin Next.js starter (Gemini tools, local agent wallet, x
 
 ```mermaid
 flowchart TD
-  User[User / judge] --> UI[Next.js dashboard]
-  UI -->|POST promise| API[Promise API]
-  UI -->|Check proof| Check[/api/promises/:id/check]
-  API --> Store[(Promises store)]
-  Check --> Agent[judgePromise — Gemini]
-  Agent --> GH[GitHub commits API]
-  Agent --> Vision[Gemini vision]
-  Agent --> Strava[Strava stub]
-  Agent --> Verdict[kept / broken / pending]
-  Verdict --> Settle[MockStakeSettler]
-  Settle -. Week 3 .-> Chain[Base Sepolia USDC escrow]
-  Friend[Friend agent] -. x402 stub .-> Back[/api/promises/:id/back]
+  User["User"] --> UI["Next.js dashboard"]
+  UI -->|create promise| API["POST /api/promises"]
+  API --> Store[("Promise store")]
+  UI -->|check proof| Check["POST /api/promises/:id/check"]
+  Check --> Agent["Agent (Gemini)"]
+  Agent --> GH["GitHub commits API"]
+  Agent --> Vision["Gemini vision (photos)"]
+  Agent --> Strava["Strava (stub)"]
+  GH --> Verdict{"kept / broken / pending"}
+  Vision --> Verdict
+  Strava --> Verdict
+  Verdict -->|kept| Refund["Refund maker (mocked)"]
+  Verdict -->|broken| Payout["Pay friend or charity (mocked)"]
+  Verdict --> Store
+  Refund -.->|week 3| Chain["USDC escrow on Base Sepolia"]
+  Payout -.->|week 3| Chain
+  Friend["Friend"] -.->|x402, week 3| Back["POST /api/promises/:id/back"]
+  Back -.-> Store
 ```
 
 You create a promise (description, deadline, proof type, stake, addresses). **Check proof** runs the agent with one tool matching the proof type. The tool returns evidence and a suggested verdict; if the model disagrees, settlement follows the tool so outages never slash a stake. `kept` / `broken` call `settleStake()` in `agent/wallet.ts` with `mocked: true` and no `txHash`.
