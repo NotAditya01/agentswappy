@@ -7,12 +7,6 @@ export type VerdictEvidence = {
   suggestedVerdict?: Verdict;
 };
 
-/**
- * Map a finished proof check to kept, broken, or pending.
- *
- * Early completion counts as kept. An outage or a missing integration never
- * slashes a stake. A missing photo only breaks the promise after the deadline.
- */
 export function suggestVerdict(input: {
   now: Date;
   deadline: Date;
@@ -45,11 +39,7 @@ export function verdictFromCheck(input: {
   });
 }
 
-/**
- * The agent records a verdict after reading the proof tool.
- * Settlement follows that verdict when it matches the evidence.
- * A mismatch settles with the proof tool so a bad model call cannot move a stake.
- */
+// If the model disagrees with verified evidence, trust the proof tool.
 export function clampVerdict(
   recorded: Verdict,
   evidence: { verified: boolean; goalMet: boolean; suggestedVerdict: Verdict } | null,

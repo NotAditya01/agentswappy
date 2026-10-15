@@ -4,7 +4,6 @@ export const DEMO_MAKER = "0x1111111111111111111111111111111111111111";
 export const DEMO_CHARITY = "0x000000000000000000000000000000000000dEaD";
 export const DEMO_FRIEND = "0x2222222222222222222222222222222222222222";
 
-/** Three promises a judge can check immediately. Dates are computed at click time. */
 export function buildDemoPromises(now = new Date()): PromiseDraft[] {
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

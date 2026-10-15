@@ -113,9 +113,8 @@ export function Dashboard() {
     <main className="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-8 px-4 py-8 md:px-12 md:py-12">
       <header className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="flex items-center font-mono text-xs font-medium tracking-[0.06em] text-muted-foreground uppercase">
-            <img src="/risein-logo.svg" alt="Rise In" className="mr-3 h-5 w-auto" />
-            <span className="text-foreground">/ Agentmaxxing</span>&nbsp;week 2
+          <p className="font-mono text-xs font-medium tracking-[0.06em] text-muted-foreground uppercase">
+            Rise In <span className="text-foreground">Agentmaxxing</span> · week 2
           </p>
           {meta && <p className="font-mono text-xs tracking-[0.06em] text-muted-foreground uppercase">Model: {meta.model}</p>}
         </div>

@@ -1,7 +1,3 @@
-/**
- * GitHub commits proof checker.
- * Uses the public REST API. GITHUB_TOKEN is optional and raises the rate limit.
- */
 import { verdictFromCheck } from "../../lib/verdict";
 import type { GithubCriteria, ProofCheckResult } from "../../lib/types";
 

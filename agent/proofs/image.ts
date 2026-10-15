@@ -1,7 +1,3 @@
-/**
- * Photo proof checker. Sends the uploaded image to Gemini vision.
- * An uncertain or unavailable reading stays pending so a stake is not slashed on a guess.
- */
 import fs from "fs/promises";
 import { GoogleGenAI } from "@google/genai";
 import { MODEL } from "../model";

@@ -1,14 +1,3 @@
-/**
- * WEEK 3 STUB
- *
- * Friends back or raise a stake with an x402 micropayment.
- * The live version should:
- *   1. Answer 402 with a price, asset, and payTo.
- *   2. Accept a signed X-PAYMENT header via verifyPayment.
- *   3. Increase the promise stake.
- * payAndFetch in agent/wallet.ts is the client side of that handshake.
- * This route accepts nothing and moves no funds.
- */
 import { backPromiseWithX402 } from "@/agent/wallet";
 import { getPromise } from "@/lib/store";
 import { parseStake } from "@/lib/validate";
@@ -30,7 +19,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       amount = parsed;
     }
   } catch {
-    // An empty body still returns the stub.
+    // ignore malformed body
   }
 
   const result = await backPromiseWithX402({ promiseId: id, amountUsdc: amount });

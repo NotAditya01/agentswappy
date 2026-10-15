@@ -1,16 +1,3 @@
-/**
- * THE AGENT'S WALLET
- *
- * The agent owns a wallet (a private key). Week 3 friends use it to sign x402
- * micropayments. Settlement of a promise stake goes through StakeSettler.
- *
- * Week 2 settlement is mocked: MockStakeSettler records who would be paid and
- * stops. It never signs or broadcasts a transaction. Replace that class with a
- * Base Sepolia USDC transfer when escrow exists.
- *
- * You create the wallet with the "Create wallet" button on the page.
- * It is saved in `.agent-wallet.json` so it survives restarts.
- */
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -27,7 +14,6 @@ const chain = createPublicClient({ chain: baseSepolia, transport: http() });
 
 export type Payment = { from: Address; to: Address; amount: string; asset: string; resource: string; nonce: string };
 
-/** The wallet from .env or .agent-wallet.json, or null if none was created yet. */
 function loadAccount() {
   const key = process.env.WALLET_PRIVATE_KEY || (fs.existsSync(WALLET_FILE) && JSON.parse(fs.readFileSync(WALLET_FILE, "utf8")).privateKey);
   return key ? privateKeyToAccount(key as Hex) : null;
@@ -39,7 +25,6 @@ function requireAccount() {
   return account;
 }
 
-/** Make a brand new wallet and save it. */
 export function createWallet() {
   if (loadAccount()) return getWalletAddress();
   const privateKey = generatePrivateKey();
@@ -57,11 +42,6 @@ export async function getWalletBalance() {
   return `${formatEther(wei)} ETH`;
 }
 
-/**
- * Fetch a URL. If it asks for payment (402), sign one with the wallet and try again.
- * Week 3 stake backing should call this against POST /api/promises/:id/back.
- * Payments are signed but not submitted on-chain.
- */
 export async function payAndFetch(url: string) {
   const first = await fetch(url);
   if (first.status !== 402) return { data: await first.json() };
@@ -86,7 +66,6 @@ export async function payAndFetch(url: string) {
   };
 }
 
-/** Used by a paid API: is this X-PAYMENT header a real, signed payment? */
 export async function verifyPayment(header: string | null) {
   if (!header) return null;
   try {
@@ -101,20 +80,10 @@ export async function verifyPayment(header: string | null) {
   }
 }
 
-/** What a Base Sepolia settlement implementation must satisfy. */
 export interface StakeSettler {
   settle(intent: SettlementIntent): Promise<SettlementReceipt>;
 }
 
-/**
- * Records the refund or forfeit and does not move funds.
- *
- * A Base Sepolia replacement should:
- *   1. Hold the stake in escrow when the promise is created.
- *   2. On kept, transfer USDC to makerAddress.
- *   3. On broken, transfer USDC to beneficiaryAddress.
- *   4. Return the transaction hash instead of null.
- */
 export class MockStakeSettler implements StakeSettler {
   async settle(intent: SettlementIntent): Promise<SettlementReceipt> {
     const kept = intent.verdict === "kept";
@@ -141,7 +110,6 @@ export class MockStakeSettler implements StakeSettler {
   }
 }
 
-/** Active settler. Swap this for an on-chain implementation later. */
 export const stakeSettler: StakeSettler = new MockStakeSettler();
 
 export function settleStake(intent: SettlementIntent): Promise<SettlementReceipt> {
@@ -149,7 +117,6 @@ export function settleStake(intent: SettlementIntent): Promise<SettlementReceipt
 }
 
 export interface StakeBacker {
-  /** Week 3: accept an x402 micropayment that increases a promise stake. */
   back(input: { promiseId: string; amountUsdc: string; backerAddress?: string }): Promise<StakeBackResult>;
 }
 

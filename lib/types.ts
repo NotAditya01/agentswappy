@@ -1,5 +1,3 @@
-/** Domain types for Proof-of-Promise. Safe to import from client components. */
-
 export type ProofType = "github_commits" | "image" | "strava";
 
 export type Verdict = "kept" | "broken" | "pending";
@@ -13,7 +11,6 @@ export type GithubCriteria = {
   repo: string;
   minCommits: number;
   author?: string;
-  /** ISO timestamp. Commits after this instant count. Defaults to the promise's createdAt. */
   since?: string;
 };
 
@@ -43,13 +40,10 @@ export type ImageProof = {
   uploadedAt: string;
 };
 
-/** Result of a proof tool. The agent reads this, then records a verdict. */
 export type ProofCheckResult = {
   provider: "github" | "image" | "strava";
-  /** False on outages, missing integrations, or an uncertain photo. */
   verified: boolean;
   goalMet: boolean;
-  /** True when the user still owes something only they can supply, such as a photo. */
   missingUserProof: boolean;
   suggestedVerdict: Verdict;
   summary: string;
@@ -58,10 +52,6 @@ export type ProofCheckResult = {
 
 export type SettlementOutcome = "refund" | "forfeit";
 
-/**
- * Receipt from StakeSettler. Week 2 always has mocked: true and txHash: null.
- * A Base Sepolia implementation should return a real transaction hash.
- */
 export type SettlementReceipt = {
   id: string;
   promiseId: string;
@@ -87,7 +77,6 @@ export type SettlementIntent = {
   beneficiaryAddress: string;
 };
 
-/** Week 3: a friend backs or raises a stake with an x402 micropayment. */
 export type StakeBackResult = {
   status: "stub";
   week: 3;
@@ -103,7 +92,6 @@ export type PromiseRecord = {
   description: string;
   deadline: string;
   proofType: ProofType;
-  /** Human-readable proof target, derived from criteria. */
   target: string;
   criteria: PromiseCriteria;
   stakeUsdc: string;

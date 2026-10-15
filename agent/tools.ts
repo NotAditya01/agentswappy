@@ -1,11 +1,3 @@
-/**
- * PROOF TOOLS
- *
- * The verdict agent may call the checker that matches the promise, then
- * record_verdict. Each checker returns evidence plus a suggestedVerdict.
- * Settlement itself is not a tool: the server settles through wallet.ts
- * after the verdict is in, so the model cannot move a stake twice.
- */
 import type { GithubCriteria, PromiseRecord, StravaCriteria, Verdict } from "@/lib/types";
 import { checkGithubCommits } from "./proofs/github";
 import { checkImageProof } from "./proofs/image";

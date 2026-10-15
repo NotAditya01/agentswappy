@@ -2,7 +2,6 @@ import "./globals.css";
 import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-// Same fonts as agentmaxxin.xyz
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
 const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
 

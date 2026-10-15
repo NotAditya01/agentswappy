@@ -1,14 +1,9 @@
-/**
- * Strava proof source.
- * Week 2 does not connect to Strava. The same interface is what Week 3 OAuth will implement.
- */
 import type { ProofCheckResult, StravaCriteria } from "../../lib/types";
 
 export type StravaQuery = StravaCriteria & { deadline: string };
 
 export interface ActivityProofSource {
   readonly id: "strava";
-  /** True once an athlete has connected OAuth. Week 2 is always false. */
   isConnected(): boolean;
   check(query: StravaQuery): Promise<ProofCheckResult>;
 }

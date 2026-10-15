@@ -1,13 +1,3 @@
-/**
- * THE AGENT
- *
- * judgePromise runs one accountability decision:
- *   1. Ask Gemini to call the proof tool for this promise.
- *   2. Gemini records kept, broken, or pending, with an explanation.
- *   3. If that verdict matches the proof tool, it stands.
- *      If it does not, settlement follows the proof tool and the explanation says so.
- *   4. With no API key, the same proof tool decides and the explanation says the model did not run.
- */
 import { GoogleGenAI, type Content, type Part } from "@google/genai";
 import { checkProof, proofToolName } from "./proofs/check";
 import { MODEL } from "./model";
