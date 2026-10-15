@@ -1,14 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronRight, ImagePlus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen, shortAddress } from "@/lib/format";
-import type { PromiseRecord, Verdict } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
+import type { PromiseRecord, TraceStep, Verdict } from "@/lib/types";
+
+const MAX_PHOTO_BYTES = 4_000_000;
+
+const TOOL_LABEL: Record<string, string> = {
+  check_github_commits: "Looked up GitHub commits",
+  check_image_proof: "Looked at the photo",
+  check_strava_activity: "Checked Strava",
+  record_verdict: "Wrote the verdict",
+  settle_stake: "Simulated settlement",
+};
 
 function verdictVariant(verdict: Verdict | null): "default" | "destructive" | "outline" | "secondary" {
   if (verdict === "kept") return "default";
@@ -17,28 +24,63 @@ function verdictVariant(verdict: Verdict | null): "default" | "destructive" | "o
   return "secondary";
 }
 
+function summaryOf(result: unknown): string | null {
+  if (!result || typeof result !== "object") return null;
+  const summary = (result as { summary?: unknown }).summary;
+  return typeof summary === "string" ? summary : null;
+}
+
+function factsOf(result: unknown): { label: string; value: string }[] {
+  if (!result || typeof result !== "object") return [];
+  const evidence = (result as { evidence?: unknown }).evidence;
+  if (!evidence || typeof evidence !== "object") return [];
+  const row = evidence as Record<string, unknown>;
+  const facts: { label: string; value: string }[] = [];
+  if (typeof row.owner === "string" && typeof row.repo === "string") {
+    facts.push({ label: "Repository", value: `${row.owner}/${row.repo}` });
+  }
+  if (typeof row.since === "string") facts.push({ label: "From", value: row.since });
+  if (typeof row.until === "string") facts.push({ label: "Until", value: row.until });
+  if (typeof row.commitCount === "number") facts.push({ label: "Commits found", value: String(row.commitCount) });
+  if (typeof row.bytesSent === "number") facts.push({ label: "Photo sent", value: `${row.bytesSent} bytes` });
+  if (typeof row.observation === "string" && row.observation) facts.push({ label: "What Gemini saw", value: row.observation });
+  if (row.connected === false) facts.push({ label: "Strava", value: "Not connected" });
+  if (row.sentToVision === false) facts.push({ label: "Photo", value: "Not sent" });
+  return facts;
+}
+
 export function PromiseCard({
   promise,
   checking,
-  stub,
+  error,
   onCheck,
-  onBack,
   onUploaded,
 }: {
   promise: PromiseRecord;
   checking: boolean;
-  stub?: string;
+  error?: string;
   onCheck: (id: string) => void;
-  onBack: (id: string) => void;
   onUploaded: () => Promise<void>;
 }) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [seconds, setSeconds] = useState(0);
   const settled = promise.verdict === "kept" || promise.verdict === "broken";
-  const label = promise.verdict ? VERDICT_LABEL[promise.verdict] : promise.status === "checking" || checking ? "Checking" : "Open";
+  const label = promise.verdict ? VERDICT_LABEL[promise.verdict] : checking ? "Checking" : "Open";
+
+  useEffect(() => {
+    if (!checking) return;
+    setSeconds(0);
+    const id = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [checking]);
 
   async function upload(file: File | null) {
     if (!file) return;
+    if (file.size > MAX_PHOTO_BYTES) {
+      setUploadError("Image must be 4 MB or smaller.");
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     try {
@@ -55,116 +97,137 @@ export function PromiseCard({
   }
 
   return (
-    <Card className="min-w-0">
+    <Card className="min-w-0" aria-busy={checking}>
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={verdictVariant(promise.verdict)} className="font-mono uppercase">
-            {label}
-          </Badge>
-          <Badge variant="outline" className="font-mono uppercase">
-            {PROOF_LABEL[promise.proofType]}
-          </Badge>
-          <span className="ml-auto font-mono text-sm">{formatUsdc(promise.stakeUsdc)} USDC</span>
+          <Badge variant={verdictVariant(promise.verdict)}>{label}</Badge>
+          <Badge variant="outline">{PROOF_LABEL[promise.proofType]}</Badge>
+          <span className="ml-auto text-sm">{formatUsdc(promise.stakeUsdc)} USDC</span>
         </div>
-        <p className="text-lg font-bold tracking-tight">{promise.description}</p>
+        <h3 className="text-base font-medium leading-snug break-words">{promise.description}</h3>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <Meta label="Target" value={promise.target} />
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <Meta label="Proof" value={promise.target} />
           <Meta label="Deadline" value={`${formatWhen(promise.deadline)} · ${dueLabel(promise.deadline)}`} />
-          <Meta label="Beneficiary" value={`${promise.beneficiaryName} · ${shortAddress(promise.beneficiaryAddress)}`} title={promise.beneficiaryAddress} />
-          <Meta label="Refund to" value={shortAddress(promise.makerAddress)} title={promise.makerAddress} />
+          <Meta label="If broken, it goes to" value={promise.beneficiaryName} />
+          <Meta label="Stake" value={`${formatUsdc(promise.stakeUsdc)} USDC, simulated`} />
         </dl>
 
         {promise.proofType === "image" && promise.imageProof && (
           <img
             src={`/api/promises/${promise.id}/proof?v=${encodeURIComponent(promise.imageProof.uploadedAt)}`}
             alt={promise.imageProof.fileName}
-            className="max-h-56 border object-contain"
+            className="max-h-64 w-full border object-contain"
           />
         )}
 
         {promise.proofType === "image" && !settled && (
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="inline-flex items-center gap-1.5 font-mono text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-              <ImagePlus className="size-3.5" /> {promise.imageProof ? "Replace photo" : "Upload photo"}
-            </span>
+            <span>{promise.imageProof ? "Replace photo" : "Add a photo"}</span>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
-              disabled={uploading}
+              disabled={uploading || checking}
               onChange={(event) => upload(event.target.files?.[0] ?? null)}
-              className="font-mono text-xs"
+              className="text-base file:mr-3 file:text-sm"
             />
+            <span className="text-muted-foreground">JPEG, PNG, WebP, or GIF, up to 4 MB.</span>
             {uploadError && <span className="text-destructive">{uploadError}</span>}
           </label>
         )}
 
-        {promise.explanation && (
-          <blockquote className="border-l-2 border-primary bg-muted px-3 py-2 text-sm whitespace-pre-wrap">{promise.explanation}</blockquote>
-        )}
-        {promise.decidedBy && (
-          <p className="font-mono text-[11px] tracking-[0.06em] text-muted-foreground uppercase">
-            {promise.decidedBy === "agent" ? "Verdict written by the agent" : "Verdict follows the proof checker"}
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Step 3</p>
+            <p className="font-medium">Check proof</p>
+          </div>
+          <Button type="button" disabled={settled || checking} onClick={() => onCheck(promise.id)} className="h-11 w-full sm:w-auto">
+            {checking ? "Checking…" : settled ? "Checked" : promise.verdict === "pending" ? "Check again" : "Check proof"}
+          </Button>
+        </div>
+
+        {checking && (
+          <p aria-live="polite" className="border px-3 py-2 text-sm">
+            The agent is checking this now{seconds > 0 ? ` (${seconds}s)` : ""}. It calls a tool, reads the result, and writes a verdict.
           </p>
         )}
 
+        {error && (
+          <p role="alert" className="border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+
+        {promise.explanation && <p className="text-sm leading-relaxed whitespace-pre-wrap">{promise.explanation}</p>}
+
         {promise.settlement && (
-          <div className={cn("flex flex-col gap-1 border px-3 py-2", promise.settlement.outcome === "refund" ? "border-primary" : "border-destructive")}>
-            <p className="font-mono text-[11px] tracking-[0.06em] uppercase">
-              <span className={promise.settlement.outcome === "refund" ? "text-primary" : "text-destructive"}>
-                {promise.settlement.outcome === "refund" ? "Refund" : "Forfeit"}
-              </span>
-              <span className="ml-2 text-muted-foreground">Mock · Base Sepolia · no transaction</span>
+          <div className="flex flex-col gap-1 border px-3 py-3 text-sm">
+            <p className="font-medium">Simulated settlement</p>
+            <p>
+              {promise.settlement.outcome === "refund"
+                ? `${formatUsdc(promise.settlement.amount)} USDC would come back to you.`
+                : `${formatUsdc(promise.settlement.amount)} USDC would go to ${promise.beneficiaryName}.`}
             </p>
-            <p className="font-medium">
-              {formatUsdc(promise.settlement.amount)} USDC → {promise.settlement.toLabel} ({shortAddress(promise.settlement.to)})
-            </p>
-            <p className="text-sm text-muted-foreground">{promise.settlement.note}</p>
+            <p className="text-muted-foreground">No money was sent.</p>
           </div>
         )}
 
-        {promise.trace.length > 0 && (
-          <Collapsible defaultOpen className="border">
-            <CollapsibleTrigger className="group flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-xs hover:bg-muted">
-              <ChevronRight className="size-3.5 transition-transform group-data-[panel-open]:rotate-90" />
-              <span className="uppercase text-muted-foreground">Reasoning trace</span>
-              <span className="text-primary">{promise.trace.length} steps</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="flex flex-col gap-3 border-t px-3 py-3">
-              {promise.trace.map((step, index) => (
-                <div key={`${step.tool}-${index}`} className="flex flex-col gap-2 font-mono text-xs">
-                  <p>
-                    <span className="text-muted-foreground uppercase">Tool </span>
-                    <span className="text-primary">{step.tool}</span>
-                    {step.error && <span className="ml-2 text-destructive">failed</span>}
-                  </p>
-                  <TraceJson label="Input" value={step.args} />
-                  <TraceJson label="Output" value={step.result} />
-                </div>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {stub && <p className="border border-dashed px-3 py-2 text-sm text-muted-foreground">{stub}</p>}
+        {promise.trace.length > 0 && <AgentRun steps={promise.trace} />}
       </CardContent>
-      <CardFooter className="flex flex-wrap gap-2">
-        <Button type="button" disabled={settled || checking} onClick={() => onCheck(promise.id)} className="font-mono tracking-wider uppercase">
-          {checking ? "Checking..." : settled ? "Settled" : promise.verdict === "pending" ? "Check again" : "Check proof"}
-        </Button>
-        <Button type="button" variant="outline" onClick={() => onBack(promise.id)} className="font-mono tracking-wider uppercase">
-          Back stake
-        </Button>
-      </CardFooter>
     </Card>
   );
 }
 
-function Meta({ label, value, title }: { label: string; value: string; title?: string }) {
+function AgentRun({ steps }: { steps: TraceStep[] }) {
+  const shown = steps.filter((step) => step.tool !== "settle_stake");
+  if (shown.length === 0) return null;
+
   return (
-    <div className="min-w-0" title={title}>
-      <dt className="font-mono text-[11px] tracking-[0.06em] text-muted-foreground uppercase">{label}</dt>
+    <div className="flex flex-col gap-3 border px-3 py-3">
+      <p className="text-sm font-medium">Agent run</p>
+      <ol className="flex flex-col gap-4">
+        {shown.map((step, index) => {
+          const summary = summaryOf(step.result);
+          const facts = factsOf(step.result);
+          return (
+            <li key={`${step.tool}-${index}`} className="flex flex-col gap-2 text-sm">
+              <p>
+                <span className="text-muted-foreground">{index + 1}. </span>
+                {TOOL_LABEL[step.tool] ?? step.tool}
+                {step.error && <span className="ml-2 text-destructive">failed</span>}
+              </p>
+              <p className="font-mono text-xs text-muted-foreground break-all">{step.tool}</p>
+              {summary && <p>{summary}</p>}
+              {facts.length > 0 && (
+                <dl className="grid gap-1">
+                  {facts.map((fact) => (
+                    <div key={fact.label} className="grid grid-cols-[7.5rem_1fr] gap-2">
+                      <dt className="text-muted-foreground">{fact.label}</dt>
+                      <dd className="break-words">{fact.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <details open className="min-w-0">
+                <summary className="cursor-pointer text-muted-foreground">Tool call and response</summary>
+                <div className="mt-2 flex flex-col gap-2">
+                  <TraceJson label="Called with" value={step.args} />
+                  <TraceJson label="Response" value={step.result} />
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function Meta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className="break-words">{value}</dd>
     </div>
   );
@@ -172,9 +235,9 @@ function Meta({ label, value, title }: { label: string; value: string; title?: s
 
 function TraceJson({ label, value }: { label: string; value: unknown }) {
   return (
-    <div>
-      <p className="mb-1 text-muted-foreground uppercase">{label}</p>
-      <pre className="max-h-64 overflow-auto bg-background p-2 whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+    <div className="min-w-0">
+      <p className="mb-1 text-xs text-muted-foreground">{label}</p>
+      <pre className="max-h-48 overflow-auto bg-background p-2 text-xs whitespace-pre-wrap break-words">{JSON.stringify(value, null, 2)}</pre>
     </div>
   );
 }
