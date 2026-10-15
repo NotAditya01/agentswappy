@@ -1,10 +1,12 @@
 import { GoogleGenAI, type Content, type Part } from "@google/genai";
-import { geminiFailure, MODEL, requireGeminiKey } from "./model";
+import { callGemini, GEMINI_BUSY, geminiFailure, MODEL, requireGeminiKey } from "./model";
 import { tools, type Tool, type ToolContext } from "./tools";
 import { clampVerdict } from "@/lib/verdict";
 import type { PromiseRecord, ProofCheckResult, TraceStep, Verdict } from "@/lib/types";
 
 export { MODEL };
+
+const CHECK_BUDGET_MS = 240_000;
 
 const MAX_STEPS = 6;
 
@@ -68,13 +70,16 @@ export async function runAgent(
   }));
   const steps: TraceStep[] = [];
   const maxSteps = options?.maxSteps ?? MAX_STEPS;
+  const deadline = Date.now() + CHECK_BUDGET_MS;
 
   for (let i = 0; i < maxSteps; i++) {
-    const response = await ai.models.generateContent({
+    if (Date.now() >= deadline) throw new Error(GEMINI_BUSY);
+    const response = await callGemini((abortSignal) => ai.models.generateContent({
       model: MODEL,
       contents,
       config: {
         systemInstruction: options?.systemPrompt,
+        abortSignal,
         temperature: 0.2,
         tools: [
           {
@@ -86,7 +91,7 @@ export async function runAgent(
           },
         ],
       },
-    });
+    }), deadline);
 
     const calls = response.functionCalls ?? [];
     if (calls.length === 0) return { answer: response.text ?? "", steps };

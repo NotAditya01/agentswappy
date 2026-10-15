@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import { GoogleGenAI } from "@google/genai";
-import { geminiFailure, MODEL, requireGeminiKey } from "../model";
+import { callGemini, GEMINI_BUSY, geminiFailure, MODEL, requireGeminiKey } from "../model";
 import { proofFilePath } from "../../lib/store";
 import { verdictFromCheck } from "../../lib/verdict";
 import type { ImageCriteria, PromiseRecord, ProofCheckResult } from "../../lib/types";
@@ -69,8 +69,9 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
   }
 
   try {
+    const mimeType = promise.imageProof.mimeType;
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
+    const response = await callGemini((abortSignal) => ai.models.generateContent({
       model: MODEL,
       contents: [
         {
@@ -86,12 +87,12 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
                 "matches is true only when the image clearly shows the claim.",
               ].join("\n"),
             },
-            { inlineData: { mimeType: promise.imageProof.mimeType, data: bytes.toString("base64") } },
+            { inlineData: { mimeType, data: bytes.toString("base64") } },
           ],
         },
       ],
-      config: { temperature: 0, responseMimeType: "application/json" },
-    });
+      config: { abortSignal, temperature: 0, responseMimeType: "application/json" },
+    }));
 
     const parsed = parseVision(response.text ?? "");
     if (!parsed || parsed.confidence < CONFIDENT) {
@@ -144,6 +145,7 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
       },
     };
   } catch (err) {
+    if (err instanceof Error && err.message === GEMINI_BUSY) throw err;
     throw geminiFailure("Gemini could not look at the photo.", err);
   }
 }
