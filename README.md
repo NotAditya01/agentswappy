@@ -87,12 +87,12 @@ npm start
 ## Two-minute demo
 
 1. Start the app. The banner tells you if the Gemini key is missing. Sample GitHub checks still work.
-2. Click **Add sample promises**. Three cards appear:
-   - At least 1 commit on `vercel/next.js` over the last 30 days, deadline yesterday.
-   - 5000 commits on `vercel/next.js` inside a one-hour window, deadline yesterday.
-   - A 5 km Strava run, deadline yesterday.
-3. **Check proof** on the first card. The trace lists GitHub commits. The verdict is kept. The settlement says refund 5.00 USDC to the maker, mock, no transaction.
-4. **Check proof** on the second card. The verdict is broken. The settlement forfeits 10.00 USDC to Demo friend. Still no transaction.
+2. Click **Add sample promises**. Three cards appear, newest first:
+   - Top: at least 1 commit on `vercel/next.js` over the last 30 days, deadline yesterday.
+   - Middle: 5000 commits on `vercel/next.js` inside a one-hour window, deadline yesterday.
+   - Bottom: a 5 km Strava run, deadline yesterday.
+3. **Check proof** on the top card. The trace lists GitHub commits. The verdict is kept. The settlement says refund 5.00 USDC to the maker, mock, no transaction.
+4. **Check proof** on the middle card. The verdict is broken. The settlement forfeits 10.00 USDC to Demo friend. Still no transaction.
 5. **Check proof** on the Strava card. The trace says the integration is not connected. The verdict stays pending and there is no settlement.
 6. Click **Back stake** on any card. The Week 3 stub explains the future x402 handshake. The stake does not change.
 

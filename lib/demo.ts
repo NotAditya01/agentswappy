@@ -16,14 +16,15 @@ export function buildDemoPromises(now = new Date()): PromiseDraft[] {
     beneficiaryAddress: DEMO_CHARITY,
   };
 
+  // Created oldest-first so the dashboard (newest first) shows kept, then broken, then Strava.
   return [
     {
       ...shared,
-      description: "Land at least one commit on vercel/next.js during the last 30 days.",
+      description: "Log a 5 km run on Strava before the deadline.",
       deadline: yesterday.toISOString(),
-      proofType: "github_commits",
-      stakeUsdc: "5.00",
-      github: { owner: "vercel", repo: "next.js", minCommits: 1, since: monthAgo.toISOString() },
+      proofType: "strava",
+      stakeUsdc: "3.00",
+      strava: { activity: "run", minDistanceKm: 5 },
     },
     {
       ...shared,
@@ -37,11 +38,11 @@ export function buildDemoPromises(now = new Date()): PromiseDraft[] {
     },
     {
       ...shared,
-      description: "Log a 5 km run on Strava before the deadline.",
+      description: "Land at least one commit on vercel/next.js during the last 30 days.",
       deadline: yesterday.toISOString(),
-      proofType: "strava",
-      stakeUsdc: "3.00",
-      strava: { activity: "run", minDistanceKm: 5 },
+      proofType: "github_commits",
+      stakeUsdc: "5.00",
+      github: { owner: "vercel", repo: "next.js", minCommits: 1, since: monthAgo.toISOString() },
     },
   ];
 }

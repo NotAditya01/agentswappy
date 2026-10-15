@@ -175,7 +175,7 @@ export function Dashboard() {
               <CardContent className="flex flex-col gap-2 py-8">
                 <p className="text-xl font-bold tracking-tight uppercase">No promises yet</p>
                 <p className="max-w-lg text-muted-foreground">
-                  Add the sample set. Check the first GitHub promise (kept), the second (broken), then the Strava one (pending, no settlement). That is the two-minute demo.
+                  Add the sample set. The top card should be kept, the middle one broken, and the Strava card pending with no settlement.
                 </p>
               </CardContent>
             </Card>
