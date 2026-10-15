@@ -61,7 +61,7 @@ Do not commit `.env`, `.agent-wallet.json`, or `data/`.
 
 Import on [Vercel](https://vercel.com/new), set `GEMINI_API_KEY` (and optional vars above). API routes use the Node.js runtime.
 
-**Live demo:** https://proof-of-promise-jeevault123.vercel.app
+**Live demo:** https://proof-of-promise.vercel.app
 
 On Vercel, cold starts can wipe `/tmp`; empty stores seed the three sample promises automatically.
 
