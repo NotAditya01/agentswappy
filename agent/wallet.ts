@@ -12,13 +12,17 @@
  * It is saved in `.agent-wallet.json` so it survives restarts.
  */
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { createPublicClient, formatEther, http, verifyMessage, type Address, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import type { SettlementIntent, SettlementReceipt, StakeBackResult } from "@/lib/types";
 
-const WALLET_FILE = path.join(process.cwd(), ".agent-wallet.json");
+const WALLET_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), "proof-of-promise")
+  : process.cwd();
+const WALLET_FILE = path.join(WALLET_DIR, ".agent-wallet.json");
 const chain = createPublicClient({ chain: baseSepolia, transport: http() });
 
 export type Payment = { from: Address; to: Address; amount: string; asset: string; resource: string; nonce: string };
@@ -39,6 +43,7 @@ function requireAccount() {
 export function createWallet() {
   if (loadAccount()) return getWalletAddress();
   const privateKey = generatePrivateKey();
+  fs.mkdirSync(WALLET_DIR, { recursive: true });
   fs.writeFileSync(WALLET_FILE, JSON.stringify({ privateKey }, null, 2));
   return privateKeyToAccount(privateKey).address;
 }
