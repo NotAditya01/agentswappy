@@ -1,9 +1,7 @@
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
-import { buildDemoPromises } from "./demo";
 import type { CreatePromiseInput, ImageProof, PromiseRecord, PromiseUpdate } from "./types";
-import { validateCreate } from "./validate";
 
 const IS_VERCEL = Boolean(process.env.VERCEL);
 const DATA_DIR = IS_VERCEL
@@ -11,8 +9,6 @@ const DATA_DIR = IS_VERCEL
   : path.join(process.cwd(), "data");
 const PROOF_DIR = path.join(DATA_DIR, "proofs");
 const DB_PATH = path.join(DATA_DIR, "promises.json");
-
-let vercelSeedAttempted = false;
 
 function draftToRecord(input: CreatePromiseInput): PromiseRecord {
   return {
@@ -39,22 +35,6 @@ function draftToRecord(input: CreatePromiseInput): PromiseRecord {
   };
 }
 
-async function seedVercelDemoIfEmpty(promises: PromiseRecord[]): Promise<PromiseRecord[]> {
-  if (!IS_VERCEL || promises.length > 0 || vercelSeedAttempted) return promises;
-  vercelSeedAttempted = true;
-
-  const seeded: PromiseRecord[] = [];
-  for (const draft of buildDemoPromises()) {
-    const parsed = validateCreate(draft);
-    if (!parsed.ok) continue;
-    seeded.push(draftToRecord(parsed.value));
-  }
-  if (seeded.length === 0) return promises;
-
-  await writeAll(seeded);
-  return seeded;
-}
-
 let queue: Promise<unknown> = Promise.resolve();
 
 function withLock<T>(fn: () => Promise<T>): Promise<T> {
@@ -70,12 +50,9 @@ async function readAll(): Promise<PromiseRecord[]> {
   try {
     const raw = await fs.readFile(DB_PATH, "utf8");
     const parsed = JSON.parse(raw) as unknown;
-    const promises = Array.isArray(parsed) ? (parsed as PromiseRecord[]) : [];
-    return seedVercelDemoIfEmpty(promises);
+    return Array.isArray(parsed) ? (parsed as PromiseRecord[]) : [];
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      return seedVercelDemoIfEmpty([]);
-    }
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw err;
   }
 }

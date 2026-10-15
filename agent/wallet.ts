@@ -104,8 +104,8 @@ export class MockStakeSettler implements StakeSettler {
       txHash: null,
       createdAt: new Date().toISOString(),
       note: kept
-        ? "Mock settlement. The stake would return to the maker on Base Sepolia. No transaction was broadcast."
-        : `Mock settlement. The stake would go to ${intent.beneficiaryName} on Base Sepolia. No transaction was broadcast.`,
+        ? "Simulated settlement. No USDC was sent. This stake would come back to you."
+        : `Simulated settlement. No USDC was sent. This stake would go to ${intent.beneficiaryName}.`,
     };
   }
 }

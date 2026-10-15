@@ -45,19 +45,18 @@ test("a missing photo is pending before the deadline and broken after", () => {
   );
 });
 
-test("clamp keeps a matching agent verdict", () => {
-  const result = clampVerdict("broken", { verified: true, goalMet: false, suggestedVerdict: "broken" });
+test("a verified check keeps the agent's verdict", () => {
+  const result = clampVerdict("broken", { verified: true });
   assert.deepEqual(result, { verdict: "broken", clamped: false, reason: null });
 });
 
-test("clamp refuses to settle when the checker could not verify", () => {
-  const result = clampVerdict("broken", { verified: false, goalMet: false, suggestedVerdict: "pending" });
+test("an unfinished check cannot settle", () => {
+  const result = clampVerdict("broken", { verified: false });
   assert.equal(result.verdict, "pending");
   assert.equal(result.clamped, true);
 });
 
-test("clamp follows the proof tool when the agent disagrees", () => {
-  const result = clampVerdict("pending", { verified: true, goalMet: false, suggestedVerdict: "broken" });
-  assert.equal(result.verdict, "broken");
-  assert.equal(result.clamped, true);
+test("pending stays pending when nothing was verified", () => {
+  const result = clampVerdict("pending", null);
+  assert.deepEqual(result, { verdict: "pending", clamped: false, reason: null });
 });
