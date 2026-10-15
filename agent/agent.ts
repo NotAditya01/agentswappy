@@ -1,9 +1,8 @@
 import { GoogleGenAI, type Content, type Part } from "@google/genai";
-import { checkProof, proofToolName } from "./proofs/check";
-import { MODEL } from "./model";
+import { geminiFailure, MODEL, requireGeminiKey } from "./model";
 import { tools, type Tool, type ToolContext } from "./tools";
 import { clampVerdict } from "@/lib/verdict";
-import type { DecidedBy, PromiseRecord, ProofCheckResult, TraceStep, Verdict } from "@/lib/types";
+import type { PromiseRecord, ProofCheckResult, TraceStep, Verdict } from "@/lib/types";
 
 export { MODEL };
 
@@ -17,21 +16,24 @@ function isProofResult(value: unknown): value is ProofCheckResult {
   return typeof result.summary === "string" && typeof result.verified === "boolean" && typeof result.suggestedVerdict === "string";
 }
 
+function isGeminiToolFailure(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.startsWith("Gemini") || message.includes("GEMINI_API_KEY");
+}
+
 function systemPrompt(promise: PromiseRecord): string {
   return [
-    "You are Proof-of-Promise, an accountability agent.",
-    "A person staked USDC on a promise. You verify it with tools and decide whether it was kept.",
-    `This promise uses proof type ${promise.proofType}. Call only that checker:`,
-    "- github_commits -> check_github_commits",
-    "- image -> check_image_proof",
-    "- strava -> check_strava_activity",
-    "The checker returns evidence and suggestedVerdict (kept, broken, or pending).",
-    "Do not invent commits, pixels, or activities.",
-    "Agree with suggestedVerdict unless the evidence block contradicts it. If you disagree, say why.",
-    "If the checker could not verify the proof, the verdict is pending. Never slash an unverified stake.",
-    "After the checker returns, call record_verdict exactly once.",
-    "The explanation is two to four sentences a person can read, and it must cite the evidence.",
-    "Do not claim that funds moved. Settlement is mocked and happens after your verdict.",
+    "You check a personal promise. Someone named a stake, but settlement is simulated and you do not move money.",
+    `This promise uses proof type ${promise.proofType}. Call that tool before you decide:`,
+    "github_commits calls check_github_commits, image calls check_image_proof, strava calls check_strava_activity.",
+    "The tool returns evidence from GitHub, from Gemini vision, or from the Strava stub. Do not invent commits, photo details, or activities.",
+    "Read the evidence, then call record_verdict once.",
+    "kept means the evidence shows the goal was met.",
+    "broken means the deadline has passed and the evidence shows the goal was missed, including no photo after the deadline.",
+    "pending means the deadline is still ahead and the goal is not met yet, or the tool could not verify the proof.",
+    "If verified is false, record pending. Never treat a failed check as a broken promise.",
+    "suggestedVerdict is only a hint. Decide from the evidence itself.",
+    "The explanation is two to four sentences and cites the evidence.",
   ].join(" ");
 }
 
@@ -39,17 +41,17 @@ function userPrompt(promise: PromiseRecord): string {
   const deadline = new Date(promise.deadline);
   const open = deadline.getTime() > Date.now();
   return [
-    "Decide this promise.",
-    `Description: ${promise.description}`,
+    "Check this promise and record a verdict.",
+    `What they promised: ${promise.description}`,
     `Target: ${promise.target}`,
     `Deadline: ${promise.deadline} (${open ? "still in the future" : "already passed"})`,
-    `Stake: ${promise.stakeUsdc} USDC`,
-    `Refund address: ${promise.makerAddress}`,
-    `Beneficiary: ${promise.beneficiaryName} (${promise.beneficiaryAddress})`,
+    `Stake: ${promise.stakeUsdc} USDC, simulated`,
+    `If they break it, it would go to: ${promise.beneficiaryName}`,
     `Proof type: ${promise.proofType}`,
-    `Criteria: ${JSON.stringify(promise.criteria)}`,
-    promise.imageProof ? `Photo attached: ${promise.imageProof.fileName}` : "No photo is attached.",
-    "Check the proof, then record the verdict.",
+    `Details: ${JSON.stringify(promise.criteria)}`,
+    promise.imageProof
+      ? `Photo attached: ${promise.imageProof.fileName} (${promise.imageProof.bytes} bytes)`
+      : "No photo is attached.",
   ].join("\n");
 }
 
@@ -58,7 +60,7 @@ export async function runAgent(
   ctx: ToolContext,
   options?: { systemPrompt?: string; toolList?: Tool[]; maxSteps?: number },
 ) {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: requireGeminiKey() });
   const toolList = options?.toolList ?? tools;
   const contents: Content[] = history.map((message) => ({
     role: message.role === "user" ? "user" : "model",
@@ -90,11 +92,19 @@ export async function runAgent(
     if (calls.length === 0) return { answer: response.text ?? "", steps };
 
     const content = response.candidates?.[0]?.content;
-    if (!content) return { answer: response.text || "The model returned no content.", steps };
+    if (!content) {
+      throw new Error("Gemini returned a tool call without a message we can continue. Nothing was settled.");
+    }
     contents.push(content);
+
+    const ordered = [...calls].sort((a, b) => {
+      if (a.name === "record_verdict") return 1;
+      if (b.name === "record_verdict") return -1;
+      return 0;
+    });
     const results: Part[] = [];
 
-    for (const call of calls) {
+    for (const call of ordered) {
       const tool = toolList.find((item) => item.name === call.name);
       let result: unknown;
       let error = false;
@@ -102,6 +112,7 @@ export async function runAgent(
         if (!tool) throw new Error(`No tool named ${call.name}`);
         result = await tool.run((call.args ?? {}) as Record<string, unknown>, ctx);
       } catch (err) {
+        if (isGeminiToolFailure(err)) throw err;
         result = { error: err instanceof Error ? err.message : String(err) };
         error = true;
       }
@@ -110,16 +121,17 @@ export async function runAgent(
     }
 
     contents.push({ role: "user", parts: results });
+    if (ctx.recorded) return { answer: ctx.recorded.explanation, steps };
   }
 
-  return { answer: "I hit my step limit before recording a verdict.", steps };
+  return { answer: "The agent stopped before it recorded a verdict.", steps };
 }
 
 export type Judgment = {
   verdict: Verdict;
   explanation: string;
   steps: TraceStep[];
-  decidedBy: DecidedBy;
+  decidedBy: "agent";
 };
 
 function latestEvidence(steps: TraceStep[]): ProofCheckResult | null {
@@ -130,28 +142,11 @@ function latestEvidence(steps: TraceStep[]): ProofCheckResult | null {
   return null;
 }
 
-function applyEvidence(evidence: ProofCheckResult, steps: TraceStep[], prefix: string): Judgment {
-  return {
-    verdict: evidence.suggestedVerdict,
-    explanation: `${prefix} ${evidence.summary}`.trim(),
-    steps,
-    decidedBy: "evidence-rules",
-  };
-}
-
 export async function judgePromise(promise: PromiseRecord): Promise<Judgment> {
-  if (!process.env.GEMINI_API_KEY) {
-    const evidence = await checkProof(promise);
-    return applyEvidence(
-      evidence,
-      [{ tool: proofToolName(promise), args: { promiseId: promise.id }, result: evidence }],
-      "GEMINI_API_KEY is not set, so the proof checker rules decided.",
-    );
-  }
-
   const ctx: ToolContext = { baseUrl: "", promise, evidenceSeen: false, recorded: null };
   let steps: TraceStep[] = [];
   let answer = "";
+
   try {
     const result = await runAgent([{ role: "user", text: userPrompt(promise) }], ctx, {
       systemPrompt: systemPrompt(promise),
@@ -160,39 +155,30 @@ export async function judgePromise(promise: PromiseRecord): Promise<Judgment> {
     steps = result.steps;
     answer = result.answer;
   } catch (err) {
-    const evidence = await checkProof(promise);
-    return applyEvidence(
-      evidence,
-      [
-        { tool: "agent", args: {}, result: { error: err instanceof Error ? err.message : String(err) }, error: true },
-        { tool: proofToolName(promise), args: { promiseId: promise.id }, result: evidence },
-      ],
-      "The model call failed, so the proof checker rules decided.",
-    );
+    if (err instanceof Error && err.message.includes("Nothing was settled")) throw err;
+    throw geminiFailure("Gemini could not check this promise.", err);
+  }
+
+  if (!ctx.recorded) {
+    const extra = answer ? ` ${answer.slice(0, 280)}` : "";
+    throw new Error(`Gemini did not record a verdict.${extra} Nothing was settled.`);
   }
 
   const evidence = latestEvidence(steps);
-  if (!ctx.recorded) {
-    if (evidence) {
-      return applyEvidence(evidence, steps, "The model did not record a verdict, so the proof checker rules decided.");
-    }
+  const clamped = clampVerdict(ctx.recorded.verdict, evidence);
+  if (clamped.clamped) {
     return {
-      verdict: "pending",
-      explanation: answer || "The agent could not verify this promise. Nothing was settled.",
+      verdict: clamped.verdict,
+      explanation: `${ctx.recorded.explanation} The check did not finish, so this stays unsettled.`,
       steps,
-      decidedBy: "evidence-rules",
+      decidedBy: "agent",
     };
   }
 
-  const clamped = clampVerdict(ctx.recorded.verdict, evidence);
-  const explanation = clamped.clamped
-    ? `${ctx.recorded.explanation} Settlement uses ${clamped.verdict} because ${clamped.reason}.`
-    : ctx.recorded.explanation;
-
   return {
-    verdict: clamped.verdict,
-    explanation,
+    verdict: ctx.recorded.verdict,
+    explanation: ctx.recorded.explanation,
     steps,
-    decidedBy: clamped.clamped ? "evidence-rules" : "agent",
+    decidedBy: "agent",
   };
 }

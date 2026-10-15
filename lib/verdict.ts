@@ -39,32 +39,16 @@ export function verdictFromCheck(input: {
   });
 }
 
-// If the model disagrees with verified evidence, trust the proof tool.
 export function clampVerdict(
   recorded: Verdict,
-  evidence: { verified: boolean; goalMet: boolean; suggestedVerdict: Verdict } | null,
+  evidence: { verified: boolean } | null,
 ): { verdict: Verdict; clamped: boolean; reason: string | null } {
-  if (!evidence || !evidence.verified) {
-    if (recorded === "pending") return { verdict: "pending", clamped: false, reason: null };
-    return {
-      verdict: "pending",
-      clamped: true,
-      reason: evidence
-        ? "the checker could not verify the proof, so nothing is settled"
-        : "no proof check was recorded, so nothing is settled",
-    };
-  }
-
-  if (recorded === evidence.suggestedVerdict) {
+  if (evidence?.verified || recorded === "pending") {
     return { verdict: recorded, clamped: false, reason: null };
   }
-
-  const reason =
-    evidence.suggestedVerdict === "kept"
-      ? "the target is already met"
-      : evidence.suggestedVerdict === "pending"
-        ? "the promise is still open or cannot be settled yet"
-        : "the deadline has passed and the proof does not meet the target";
-
-  return { verdict: evidence.suggestedVerdict, clamped: true, reason };
+  return {
+    verdict: "pending",
+    clamped: true,
+    reason: evidence ? "the check did not finish" : "no proof check was recorded",
+  };
 }

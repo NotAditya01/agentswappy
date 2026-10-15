@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import { GoogleGenAI } from "@google/genai";
-import { MODEL } from "../model";
+import { geminiFailure, MODEL, requireGeminiKey } from "../model";
 import { proofFilePath } from "../../lib/store";
 import { verdictFromCheck } from "../../lib/verdict";
 import type { ImageCriteria, PromiseRecord, ProofCheckResult } from "../../lib/types";
@@ -54,19 +54,22 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
     };
   }
 
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = requireGeminiKey();
+  let bytes: Buffer;
+  try {
+    bytes = await fs.readFile(proofFilePath(promise.imageProof.storedName));
+  } catch {
     return {
       ...base,
       verified: false,
       suggestedVerdict: "pending",
-      summary: "A photo is attached, but GEMINI_API_KEY is missing, so vision did not run. Nothing is settled.",
-      evidence: { claim, uploaded: true, fileName: promise.imageProof.fileName },
+      summary: "The photo file could not be read, so it was not sent to Gemini. Nothing is settled.",
+      evidence: { claim, uploaded: true, fileName: promise.imageProof.fileName, sentToVision: false },
     };
   }
 
   try {
-    const bytes = await fs.readFile(proofFilePath(promise.imageProof.storedName));
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: MODEL,
       contents: [
@@ -103,6 +106,9 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
           claim,
           uploaded: true,
           fileName: promise.imageProof.fileName,
+          sentToVision: true,
+          bytesSent: bytes.length,
+          model: MODEL,
           observation: parsed?.observation ?? null,
           confidence: parsed?.confidence ?? null,
         },
@@ -129,18 +135,15 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
         claim,
         uploaded: true,
         fileName: promise.imageProof.fileName,
+        sentToVision: true,
+        bytesSent: bytes.length,
+        model: MODEL,
         matches: parsed.matches,
         confidence: parsed.confidence,
         observation: parsed.observation,
       },
     };
   } catch (err) {
-    return {
-      ...base,
-      verified: false,
-      suggestedVerdict: "pending",
-      summary: `Vision failed (${err instanceof Error ? err.message : String(err)}). Nothing is settled.`,
-      evidence: { claim, uploaded: true, fileName: promise.imageProof.fileName },
-    };
+    throw geminiFailure("Gemini could not look at the photo.", err);
   }
 }

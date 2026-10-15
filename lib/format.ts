@@ -9,7 +9,7 @@ export const PROOF_LABEL: Record<ProofType, string> = {
 export const VERDICT_LABEL: Record<Verdict, string> = {
   kept: "Kept",
   broken: "Broken",
-  pending: "Pending",
+  pending: "Not yet",
 };
 
 export function formatUsdc(amount: string): string {

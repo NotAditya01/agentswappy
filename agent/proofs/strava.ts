@@ -19,7 +19,7 @@ export const stravaProofSource: ActivityProofSource = {
       goalMet: false,
       missingUserProof: false,
       suggestedVerdict: "pending",
-      summary: `Strava is not connected, so a ${query.activity}${distance} cannot be verified. Week 3 will read activities after OAuth. The stake stays unsettled.`,
+      summary: `Strava is not connected, so a ${query.activity}${distance} cannot be verified. Nothing is settled.`,
       evidence: {
         connected: false,
         week: 3,

@@ -28,7 +28,7 @@ export const tools: Tool[] = [
   {
     name: "check_github_commits",
     description:
-      "Count public GitHub commits for the current promise. Use this only when the proof type is github_commits. Returns evidence and a suggestedVerdict of kept, broken, or pending.",
+      "Look up public GitHub commits for this promise's repository, author, and date window. Call this when the proof type is github_commits. Returns the live API evidence. It does not settle the stake.",
     parameters: { type: "object", properties: {} },
     run: async (_args, ctx) => {
       const promise = requirePromise(ctx);
@@ -47,7 +47,7 @@ export const tools: Tool[] = [
   {
     name: "check_image_proof",
     description:
-      "Look at the photo attached to the current promise with vision. Use this only when the proof type is image. Returns evidence and a suggestedVerdict.",
+      "Send this promise's uploaded photo to Gemini vision and return what the model saw. Call this when the proof type is image. It does not settle the stake.",
     parameters: { type: "object", properties: {} },
     run: async (_args, ctx) => {
       const promise = requirePromise(ctx);
@@ -60,7 +60,7 @@ export const tools: Tool[] = [
   {
     name: "check_strava_activity",
     description:
-      "Check a Strava activity for the current promise. Week 2 is a stub: it reports that Strava is not connected and suggests pending. Use this only when the proof type is strava.",
+      "Check a Strava activity for this promise. Strava is not connected, so the result says the activity could not be verified. Call this when the proof type is strava.",
     parameters: { type: "object", properties: {} },
     run: async (_args, ctx) => {
       const promise = requirePromise(ctx);
@@ -87,7 +87,7 @@ export const tools: Tool[] = [
     },
     run: async (args, ctx) => {
       if (!ctx.evidenceSeen) throw new Error("Check the proof before recording a verdict.");
-      const verdict = String(args.verdict ?? "") as Verdict;
+      const verdict = String(args.verdict ?? "").trim().toLowerCase() as Verdict;
       if (!VERDICTS.includes(verdict)) throw new Error("Verdict must be kept, broken, or pending.");
       const explanation = String(args.explanation ?? "").trim();
       if (explanation.length < 10) throw new Error("Explanation must cite the evidence.");

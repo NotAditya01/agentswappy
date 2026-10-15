@@ -3,6 +3,7 @@ import { attachImageProof, getPromise, proofFilePath } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function sniffMime(bytes: Buffer, declared: string): string | null {
   const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -42,6 +43,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const file = form.get("image");
   if (!(file instanceof File)) return Response.json({ error: "Choose an image file." }, { status: 400 });
+  if (file.size > 4_000_000) return Response.json({ error: "Image must be 4 MB or smaller." }, { status: 400 });
 
   const bytes = Buffer.from(await file.arrayBuffer());
   const mimeType = sniffMime(bytes, file.type);

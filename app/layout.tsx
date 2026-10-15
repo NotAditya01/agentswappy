@@ -7,7 +7,7 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jet
 
 export const metadata = {
   title: "Proof of Promise",
-  description: "Stake a promise in USDC. An agent checks the proof and settles it.",
+  description: "Make a promise. An agent checks the proof. Settlement is simulated.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
