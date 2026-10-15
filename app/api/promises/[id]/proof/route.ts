@@ -3,7 +3,6 @@ import { attachImageProof, getPromise, proofFilePath } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 function sniffMime(bytes: Buffer, declared: string): string | null {
   const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
