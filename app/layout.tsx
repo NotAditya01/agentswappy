@@ -6,7 +6,10 @@ import { cn } from "@/lib/utils";
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
 const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
 
-export const metadata = { title: "Agentic Starter" };
+export const metadata = {
+  title: "Proof of Promise",
+  description: "Stake a promise in USDC. An agent checks the proof and settles it.",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

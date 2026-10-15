@@ -1,192 +1,122 @@
-# agentmaxxin
+# Proof of Promise
 
-A minimal Next.js template for building AI agents that call tools and pay for services with their own crypto wallet. The agent is powered by Google Gemini.
+Week 2 build for the Rise In Agentmaxxing hackathon. A person states a promise and stakes USDC. An agent checks the proof with tools and decides whether the promise was kept. A kept stake is refunded to the maker. A broken stake goes to a named friend or charity.
 
-The template is intentionally small. You will spend almost all of your time in a single file, `agent/tools.ts`, where each tool is a plain TypeScript function that the agent can decide to call.
+Settlement is mocked. No wallet is charged and no transaction is broadcast. Friends backing a stake with x402 micropayments is a Week 3 stub.
 
-## What You Get
+Built on the [agentmaxxin](https://github.com/risein) Next.js starter: Gemini tool calling, a local agent wallet, and the x402 payment helper.
 
-1. A working agent loop that sends your message to Gemini, runs any tools Gemini asks for, and returns the final answer.
-2. A tools file where you add, remove, or change the functions your agent can use.
-3. An agent wallet that can sign payments, based on the x402 payment pattern.
-4. A mock paid weather API that refuses requests until the agent pays for them.
-5. A single page interface with guided setup, a one click wallet button, and a chat that shows every tool call and payment.
+## How a check works
 
-## Prerequisites
+1. You create a promise: description, deadline, proof type, target, stake, refund address, and beneficiary.
+2. The promise is stored in `data/promises.json` on this machine.
+3. **Check proof** runs the agent. It may call only the tool that matches the proof type.
+4. The tool returns evidence and a suggested verdict: `kept`, `broken`, or `pending`.
+5. The agent records an explanation. If that verdict matches the evidence, it stands. If it does not, settlement follows the proof tool and the explanation says why. An outage never slashes a stake.
+6. `kept` or `broken` calls `settleStake()` in `agent/wallet.ts`. The receipt is marked `mocked: true` with `txHash: null`. `pending` settles nothing.
 
-1. Node.js version 20 or newer. Check with `node -v`.
-2. A free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+Early completion counts. A GitHub target that is already met is kept even before the deadline. A missing photo is pending until the deadline, then broken. Strava is not connected, so it stays pending.
 
-## Getting Started
+Without `GEMINI_API_KEY`, GitHub and Strava still check, and the stored explanation says the proof rules decided. Photo vision needs the key.
 
-### Step 1. Create your project
+## Architecture
 
-Run the following command in your terminal. Replace `my-agent` with any folder name you like.
-
-```bash
-npx agentmaxxin my-agent
+```mermaid
+flowchart LR
+  UI[Dashboard] --> API[Promise API]
+  API --> Store[(data/promises.json)]
+  API --> Agent[judgePromise]
+  Agent --> GH[GitHub REST API]
+  Agent --> Vision[Gemini vision]
+  Agent --> Strava[Strava stub]
+  API --> Settle[MockStakeSettler]
+  Settle -. Week 3 .-> Chain[Base Sepolia USDC]
+  Friend[Friend agent] -. x402 stub .-> Back[/api/promises/:id/back]
 ```
 
-This copies the template into a new folder, creates a `.env` file for you, and installs all packages.
+| Path | Role |
+| :--- | :--- |
+| `app/page.tsx` | Dashboard: create a promise, see status, trace, and settlement. |
+| `app/api/promises/route.ts` | List and create promises. |
+| `app/api/promises/[id]/check/route.ts` | Run the verdict and mock settlement. |
+| `app/api/promises/[id]/proof/route.ts` | Upload or read a photo. |
+| `app/api/promises/[id]/back/route.ts` | Week 3 x402 stub. Accepts no payment. |
+| `app/api/wallet/route.ts` | Create and read the agent wallet. |
+| `agent/agent.ts` | Gemini loop and `judgePromise`. |
+| `agent/tools.ts` | `check_github_commits`, `check_image_proof`, `check_strava_activity`, `record_verdict`. |
+| `agent/proofs/github.ts` | Public GitHub commits API. Optional `GITHUB_TOKEN`. |
+| `agent/proofs/image.ts` | Gemini vision over the uploaded photo. |
+| `agent/proofs/strava.ts` | `ActivityProofSource` interface. Week 2 always returns not connected. |
+| `agent/wallet.ts` | Wallet, x402 `payAndFetch`, `StakeSettler`, and `StakeBacker`. |
+| `lib/store.ts` | JSON file persistence. |
+| `data/` | Local promises and photos. Gitignored. |
 
-### Step 2. Move into the project folder
+`StakeSettler` is the seam for Base Sepolia. `MockStakeSettler` is the only implementation today. Swap `stakeSettler` in `agent/wallet.ts` when an escrow contract can refund the maker or pay the beneficiary.
+
+## Setup
+
+Requirements: Node.js 20 or newer.
 
 ```bash
-cd my-agent
+cp .env.example .env
+npm install
 ```
 
-### Step 3. Add your Gemini API key
+| Variable | Required | Purpose |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | For agent wording and photos | Free key from [Google AI Studio](https://aistudio.google.com/apikey). |
+| `GEMINI_MODEL` | No | Defaults to `gemini-flash-latest`. Use a model that can call tools and read images. |
+| `GITHUB_TOKEN` | No | Raises the unauthenticated 60 request/hour GitHub limit. No scopes needed for public commits. |
+| `WALLET_PRIVATE_KEY` | No | Test key only. Otherwise use **Create wallet** on the page. Never fund it with real assets. |
 
-Open the `.env` file in the project root and paste your key after the equals sign:
+`data/` and `.agent-wallet.json` are gitignored. Do not commit `.env`.
 
-```bash
-GEMINI_API_KEY=your_key_here
-```
-
-Save the file. The key stays on your machine and is never committed to git.
-
-### Step 4. Start the app
+## Run
 
 ```bash
 npm run dev
 ```
 
-### Step 5. Create the agent wallet
+Open [http://localhost:3000](http://localhost:3000).
 
-Open [http://localhost:3000](http://localhost:3000) in your browser. The Setup panel on the left walks you through everything.
-
-Click **Create wallet**. The agent now has its own wallet, which it uses to sign payments for paid APIs. The wallet is saved in `.agent-wallet.json` in your project folder, so it stays the same after a restart.
-
-### Step 6. Talk to your agent
-
-Try one of these prompts:
-
-1. `What's the weather in Mumbai?` The agent calls the paid weather API and pays for it with its wallet.
-2. `What's in your wallet?` The agent reads its own wallet address and balance.
-3. `Roll a 20 sided dice` The agent calls a simple tool with no wallet involved.
-
-Click any tool entry above a reply to see exactly what the agent sent and received. The agent remembers the conversation, so you can ask follow up questions. Use **Clear** to start over.
-
-### Step 7. Build your own tool
-
-Open `agent/tools.ts` and add a new object to the `tools` list. For example:
-
-```ts
-{
-  name: "get_joke",
-  description: "Get a random joke.",
-  parameters: { type: "object", properties: {} },
-  run: async () => {
-    const res = await fetch("https://official-joke-api.appspot.com/random_joke");
-    return res.json();
-  },
-},
+```bash
+npm run build
+npm start
 ```
 
-Save the file and refresh the page. Your new tool appears in the Tools panel. Now ask your agent to tell you a joke.
+## Two-minute demo
 
-## Writing Good Tools
+1. Start the app. The banner tells you if the Gemini key is missing. Sample GitHub checks still work.
+2. Click **Add sample promises**. Three cards appear:
+   - At least 1 commit on `vercel/next.js` over the last 30 days, deadline yesterday.
+   - 5000 commits on `vercel/next.js` inside a one-hour window, deadline yesterday.
+   - A 5 km Strava run, deadline yesterday.
+3. **Check proof** on the first card. The trace lists GitHub commits. The verdict is kept. The settlement says refund 5.00 USDC to the maker, mock, no transaction.
+4. **Check proof** on the second card. The verdict is broken. The settlement forfeits 10.00 USDC to Demo friend. Still no transaction.
+5. **Check proof** on the Strava card. The trace says the integration is not connected. The verdict stays pending and there is no settlement.
+6. Click **Back stake** on any card. The Week 3 stub explains the future x402 handshake. The stake does not change.
 
-Every tool has four parts.
+Optional photo path: create a promise with proof type Photo, upload an image, then check it. Vision needs `GEMINI_API_KEY`.
 
-| Field | Purpose |
-| :--- | :--- |
-| `name` | A unique identifier in snake case, such as `get_weather`. |
-| `description` | Plain English explaining what the tool does. Gemini reads this to decide when to use it, so be clear and specific. |
-| `parameters` | A JSON Schema describing the inputs. Gemini fills in these values for you. |
-| `run` | The function that does the work. Whatever it returns is sent back to Gemini. |
+Past deadlines are allowed so a demo does not have to wait.
 
-A few guidelines:
+## Week 3 roadmap
 
-1. Return plain objects, for example `{ temperature: 28 }`, rather than strings or class instances.
-2. Keep each tool focused on one job. Several small tools work better than one large tool.
-3. If something can fail, let it throw. The agent loop catches the error and reports it back to Gemini, which can then explain the problem or try again.
-
-## How It Works
-
-### The agent loop
-
-The loop lives in `agent/agent.ts`.
-
-1. Your message and the list of tools are sent to Gemini.
-2. If Gemini replies with a tool call, the matching `run` function is executed and its result is sent back to Gemini.
-3. This repeats until Gemini replies with plain text, which becomes the final answer.
-4. The loop stops after five rounds to prevent runaway tool calls.
-
-### Paying for an API
-
-The weather tool demonstrates the x402 pattern, where an agent pays for an API one request at a time.
-
-1. The agent requests `/api/weather`.
-2. The API responds with status `402 Payment Required` along with a price, an asset, and a recipient address.
-3. The agent wallet signs a payment message for that amount.
-4. The agent repeats the request with the signed payment in an `X-PAYMENT` header.
-5. The API verifies the signature and responds with status `200 OK` and the weather data.
-
-All of this is handled by the `payAndFetch` helper in `agent/wallet.ts`. Any tool that calls a paid API can use the same helper.
-
-Payments in this template are cryptographically signed but are not submitted to a blockchain, so no real funds are ever moved.
-
-## Project Structure
-
-| Path | Description |
-| :--- | :--- |
-| `agent/tools.ts` | The tools your agent can use. This is the file you will edit most. |
-| `agent/agent.ts` | The agent loop that communicates with Gemini. |
-| `agent/wallet.ts` | The agent wallet, payment signing, and payment verification. |
-| `app/page.tsx` | The page: setup steps, tools list, and chat. |
-| `app/api/agent/route.ts` | The server endpoint that runs the agent. |
-| `app/api/wallet/route.ts` | The server endpoint that creates and reads the agent wallet. |
-| `app/api/weather/route.ts` | The mock paid weather API. |
-| `components/ui/` | Interface components from [shadcn/ui](https://ui.shadcn.com). You do not need to edit these. |
-| `.env` | Your API key and optional settings. |
-| `.agent-wallet.json` | The agent wallet, created when you click Create wallet. Never share this file. |
-
-## Configuration
-
-All settings live in the `.env` file.
-
-| Variable | Required | Description |
-| :--- | :--- | :--- |
-| `GEMINI_API_KEY` | Yes | Your Gemini API key. |
-| `GEMINI_MODEL` | No | The Gemini model to use. Defaults to `gemini-flash-latest`. |
-| `WALLET_PRIVATE_KEY` | No | Use an existing wallet instead of the Create wallet button. A private key starting with `0x`. When set, it takes priority over `.agent-wallet.json`. |
-
-Restart `npm run dev` after changing any value in `.env`.
-
-## The Agent Wallet
-
-Clicking **Create wallet** generates a new private key and saves it to `.agent-wallet.json`. The file is listed in `.gitignore`, so it is never committed.
-
-Once the wallet exists, the Setup panel shows:
-
-1. The wallet address, with a button to copy it.
-2. The current ETH balance on Base Sepolia, with a refresh button.
-3. A link to view the wallet on the Base Sepolia block explorer.
-4. A link to faucets where you can request free test ETH.
-
-To start again with a new wallet, stop the server, delete `.agent-wallet.json`, restart, and click **Create wallet** again.
-
-To use a wallet you already have, set `WALLET_PRIVATE_KEY` in `.env` instead.
-
-> **Security note:** Only ever use this wallet for testing. Never send real funds to it. Private keys in `.agent-wallet.json` and `.env` are stored as plain text.
+1. Escrow on Base Sepolia. Creating a promise locks test USDC. Replace `MockStakeSettler.settle` so `kept` transfers to `makerAddress`, `broken` transfers to `beneficiaryAddress`, and the receipt carries a real `txHash`.
+2. x402 stake backing. `POST /api/promises/:id/back` returns 402 with a price. A friend's agent pays with `payAndFetch`. `verifyPayment` checks the signature and `X402StakeBacker` increases `stakeUsdc`.
+3. Strava OAuth. Implement `ActivityProofSource.isConnected` and `check` in `agent/proofs/strava.ts` using `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, and a refresh token. Until then the stub must keep returning pending.
+4. A deadline wake-up so open promises are checked when the time passes, instead of only when someone clicks the button.
+5. Stay on testnet until the escrow path has been reviewed. This demo wallet is plain text on disk.
 
 ## Troubleshooting
 
-| Problem | Solution |
+| Problem | What to do |
 | :--- | :--- |
-| The page says to add `GEMINI_API_KEY` | Add your key to `.env` and restart `npm run dev`. |
-| The agent never uses my new tool | Make the `description` more specific about when the tool should be used, then restart the server. |
-| The weather tool fails with "no wallet yet" | Click **Create wallet** in the Setup panel, then ask again. |
-| Port 3000 is already in use | Run `npm run dev -- -p 3001` and open that port instead. |
-| A model error appears in the chat | Check that your API key is valid, or set a different model in `GEMINI_MODEL`. |
-
-## Tech Stack
-
-1. [Next.js](https://nextjs.org) for the app and API routes.
-2. [shadcn/ui](https://ui.shadcn.com) and [Tailwind CSS](https://tailwindcss.com) for the interface.
-3. [Google Gen AI SDK](https://www.npmjs.com/package/@google/genai) for Gemini function calling.
-4. [viem](https://viem.sh) for wallet creation, message signing, and reading Base Sepolia.
+| The page says the Gemini key is missing | Put it in `.env` and restart `npm run dev`. |
+| GitHub check says 403 or 429 | Wait, or set `GITHUB_TOKEN` and restart. The stake stays pending on an API error. |
+| A photo check stays pending | Upload an image and set `GEMINI_API_KEY`. A low-confidence reading also stays pending. |
+| Port 3000 is in use | `npm run dev -- -p 3001` |
+| A promise is stuck on Checking | A crashed check is retried after 90 seconds. |
 
 ## License
 

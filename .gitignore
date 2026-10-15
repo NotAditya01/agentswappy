@@ -1,7 +1,9 @@
 node_modules
 .next
 .env
+.env.local
 .agent-wallet.json
+data/
 next-env.d.ts
 *.tsbuildinfo
 .DS_Store
