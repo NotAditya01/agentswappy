@@ -54,7 +54,7 @@ npm run dev
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Yes, for every check | [Google AI Studio](https://aistudio.google.com/apikey) |
-| `GEMINI_MODEL` | No | Default `gemini-3.8-flash` (tool calling and images) |
+| `GEMINI_MODEL` | No | Default `gemini-3.6-flash` (tool calling and images) |
 | `GITHUB_TOKEN` | No | Public commits only; helps rate limits |
 | `WALLET_PRIVATE_KEY` | No | Week 3. Week 2 settlement does not sign or broadcast |
 

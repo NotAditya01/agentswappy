@@ -1,4 +1,4 @@
-export const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
+export const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
 
 export function requireGeminiKey(): string {
   const key = process.env.GEMINI_API_KEY?.trim();
