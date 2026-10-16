@@ -60,7 +60,10 @@ export function Dashboard() {
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:py-12">
       <header className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">Settlement is simulated. No real money moves.</p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Proof of Promise</h1>
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="" width={44} height={44} className="size-11" />
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Swappy</h1>
+        </div>
         <p className="text-base text-muted-foreground">
           Make a promise, find it in the list, then check the proof. The agent calls a tool, reads the result, and decides if you kept it.
         </p>

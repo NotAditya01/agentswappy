@@ -1,6 +1,8 @@
-<p align="center"><img src="public/logo.svg" width="72" alt="Proof of Promise logo"></p>
+<p align="center"><img src="public/logo.png" width="120" alt="Swappy mascot"></p>
 
-# Proof of Promise
+# Swappy
+
+**Put money on your promises.**
 
 Stake USDC on a personal promise. An agent checks your proof (GitHub, photo, Strava) and decides whether you get the stake back or it goes to a friend or charity.
 
@@ -8,7 +10,7 @@ Stake USDC on a personal promise. An agent checks your proof (GitHub, photo, Str
 
 ## The problem
 
-Everyone says "I'll ship it this week" or "I'll start running." Nothing happens when we don't. Telling friends doesn't stick, and asking a friend to judge is awkward. Proof of Promise puts money on the line and lets an agent be the neutral judge: it reads the real evidence and settles the stake.
+Everyone says "I'll ship it this week" or "I'll start running." Nothing happens when we don't. Telling friends doesn't stick, and asking a friend to judge is awkward. Swappy puts money on the line and lets an agent be the neutral judge: it reads the real evidence and settles the stake.
 
 Built for Rise In Agentmaxxing. Week 2: settlement is simulated (no real transfers), and friend backing via x402 is stubbed.
 
@@ -128,9 +130,9 @@ Past deadlines are allowed, so a GitHub window that already ended can be checked
 
 ## Demo links
 
-Week 1 (proofofpromise.v1): n/a  
-Week 2 (proofofpromise.v2): https://youtu.be/WDhPanZ4RVA  
-Week 3 (proofofpromise.v3): coming soon
+Week 1 (swappy.v1): n/a  
+Week 2 (swappy.v2): https://youtu.be/WDhPanZ4RVA  
+Week 3 (swappy.v3): coming soon
 
 Live: https://proof-of-promise.vercel.app
 
@@ -144,7 +146,7 @@ Live: https://proof-of-promise.vercel.app
 
 ## Social
 
-X: coming soon
+X: [@swappy_ai](https://x.com/swappy_ai)
 
 ## License
 
