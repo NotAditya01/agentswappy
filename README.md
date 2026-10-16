@@ -4,7 +4,7 @@
 
 Stake USDC on a personal promise. An agent checks your proof (GitHub, photo, Strava) and decides whether you get the stake back or it goes to a friend or charity.
 
-**Live:** https://proof-of-promise.vercel.app · **Demo video:** [docs/demo.mp4](https://github.com/NotAditya01/agentswappy/blob/main/docs/demo.mp4)
+**Live:** https://proof-of-promise.vercel.app · **Demo video:** [YouTube](https://youtu.be/WDhPanZ4RVA)
 
 ## The problem
 
@@ -129,7 +129,7 @@ Past deadlines are allowed, so a GitHub window that already ended can be checked
 ## Demo links
 
 Week 1 (proofofpromise.v1): n/a  
-Week 2 (proofofpromise.v2): https://github.com/NotAditya01/agentswappy/blob/main/docs/demo.mp4  
+Week 2 (proofofpromise.v2): https://youtu.be/WDhPanZ4RVA  
 Week 3 (proofofpromise.v3): coming soon
 
 Live: https://proof-of-promise.vercel.app
