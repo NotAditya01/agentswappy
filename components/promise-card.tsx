@@ -149,7 +149,7 @@ export function PromiseCard({
 
         {checking && (
           <p aria-live="polite" className="border px-3 py-2 text-sm">
-            The agent is checking this now{seconds > 0 ? ` (${seconds}s)` : ""}. It calls a tool, reads the result, and writes a verdict.
+            Swappy is checking this now{seconds > 0 ? ` (${seconds}s)` : ""}. It calls a tool, reads the result, and writes a verdict.
           </p>
         )}
 
@@ -159,7 +159,12 @@ export function PromiseCard({
           </p>
         )}
 
-        {promise.explanation && <p className="text-sm leading-relaxed whitespace-pre-wrap">{promise.explanation}</p>}
+        {promise.explanation && (
+          <div className="flex flex-col gap-1 text-sm">
+            <p className="font-medium">Swappy&apos;s verdict</p>
+            <p className="leading-relaxed whitespace-pre-wrap">{promise.explanation}</p>
+          </div>
+        )}
 
         {promise.settlement && (
           <div className="flex flex-col gap-1 border px-3 py-3 text-sm">
@@ -185,7 +190,7 @@ function AgentRun({ steps }: { steps: TraceStep[] }) {
 
   return (
     <div className="flex flex-col gap-3 border px-3 py-3">
-      <p className="text-sm font-medium">Agent run</p>
+      <p className="text-sm font-medium">What Swappy did</p>
       <ol className="flex flex-col gap-4">
         {shown.map((step, index) => {
           const summary = summaryOf(step.result);

@@ -6,8 +6,8 @@ const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space
 const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
 
 export const metadata = {
-  title: "Swappy",
-  description: "Swappy: put money on your promises. Make a promise. An agent checks the proof. Settlement is simulated.",
+  title: "Proof of Promise",
+  description: "Put money on your promises. Swappy, the agent, checks the proof. Settlement is simulated.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

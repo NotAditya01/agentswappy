@@ -14,7 +14,7 @@ const MAX_PHOTO_BYTES = 4_000_000;
 
 const PROOF_HELP: Record<ProofType, string> = {
   github_commits: "We look up public commits on the repository you name, from the start date through the deadline.",
-  image: "Upload a photo. The check sends that image to Gemini, and the agent decides if it shows what you described.",
+  image: "Upload a photo. The check sends that image to Gemini, and Swappy decides if it shows what you described.",
   strava: "Strava is not connected yet. A check stays unfinished, and nothing is settled.",
 };
 

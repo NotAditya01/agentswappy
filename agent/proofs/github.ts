@@ -37,7 +37,7 @@ function mapCommit(raw: unknown): GithubCommit {
 function githubHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github+json",
-    "User-Agent": "swappy",
+    "User-Agent": "proof-of-promise",
     "X-GitHub-Api-Version": "2022-11-28",
   };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;

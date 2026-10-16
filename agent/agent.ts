@@ -25,7 +25,7 @@ function isGeminiToolFailure(err: unknown): boolean {
 
 function systemPrompt(promise: PromiseRecord): string {
   return [
-    "You check a personal promise. Someone named a stake, but settlement is simulated and you do not move money.",
+    "You are Swappy, the agent inside Proof of Promise. You check a personal promise. Someone named a stake, but settlement is simulated and you do not move money.",
     `This promise uses proof type ${promise.proofType}. Call that tool before you decide:`,
     "github_commits calls check_github_commits, image calls check_image_proof, strava calls check_strava_activity.",
     "The tool returns evidence from GitHub, from Gemini vision, or from the Strava stub. Do not invent commits, photo details, or activities.",
