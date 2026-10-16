@@ -1,16 +1,14 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { createPublicClient, formatEther, http, verifyMessage, type Address, type Hex } from "viem";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { baseSepolia } from "viem/chains";
+import { verifyMessage, type Address, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import type { SettlementIntent, SettlementReceipt, StakeBackResult } from "@/lib/types";
 
 const WALLET_DIR = process.env.VERCEL
   ? path.join(os.tmpdir(), "proof-of-promise")
   : process.cwd();
 const WALLET_FILE = path.join(WALLET_DIR, ".agent-wallet.json");
-const chain = createPublicClient({ chain: baseSepolia, transport: http() });
 
 export type Payment = { from: Address; to: Address; amount: string; asset: string; resource: string; nonce: string };
 
@@ -21,25 +19,8 @@ function loadAccount() {
 
 function requireAccount() {
   const account = loadAccount();
-  if (!account) throw new Error("The agent has no wallet yet. Ask the user to click 'Create wallet' first.");
+  if (!account) throw new Error("The agent has no wallet yet. Set WALLET_PRIVATE_KEY to a test wallet.");
   return account;
-}
-
-export function createWallet() {
-  if (loadAccount()) return getWalletAddress();
-  const privateKey = generatePrivateKey();
-  fs.mkdirSync(WALLET_DIR, { recursive: true });
-  fs.writeFileSync(WALLET_FILE, JSON.stringify({ privateKey }, null, 2));
-  return privateKeyToAccount(privateKey).address;
-}
-
-export function getWalletAddress() {
-  return loadAccount()?.address ?? null;
-}
-
-export async function getWalletBalance() {
-  const wei = await chain.getBalance({ address: requireAccount().address });
-  return `${formatEther(wei)} ETH`;
 }
 
 export async function payAndFetch(url: string) {
