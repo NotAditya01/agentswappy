@@ -1,5 +1,4 @@
-import fs from "fs/promises";
-import { attachImageProof, getPromise, proofFilePath } from "@/lib/store";
+import { attachImageProof, getPromise, readProofBytes } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,8 +18,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const promise = await getPromise(id);
   if (!promise?.imageProof) return Response.json({ error: "No photo uploaded." }, { status: 404 });
 
-  const bytes = await fs.readFile(proofFilePath(promise.imageProof.storedName));
-  return new Response(bytes, {
+  const bytes = await readProofBytes(promise.imageProof.storedName).catch(() => null);
+  if (!bytes) return Response.json({ error: "The photo is missing from storage." }, { status: 404 });
+  return new Response(new Uint8Array(bytes), {
     headers: {
       "Content-Type": promise.imageProof.mimeType,
       "Cache-Control": "private, max-age=60",

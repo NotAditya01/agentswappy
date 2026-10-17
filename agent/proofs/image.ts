@@ -1,7 +1,6 @@
-import fs from "fs/promises";
 import { GoogleGenAI } from "@google/genai";
 import { callGemini, GEMINI_BUSY, geminiFailure, MODEL, requireGeminiKey } from "../model";
-import { proofFilePath } from "../../lib/store";
+import { readProofBytes } from "../../lib/store";
 import { verdictFromCheck } from "../../lib/verdict";
 import type { ImageCriteria, PromiseRecord, ProofCheckResult } from "../../lib/types";
 
@@ -57,7 +56,7 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
   const apiKey = requireGeminiKey();
   let bytes: Buffer;
   try {
-    bytes = await fs.readFile(proofFilePath(promise.imageProof.storedName));
+    bytes = await readProofBytes(promise.imageProof.storedName);
   } catch {
     return {
       ...base,

@@ -56,7 +56,7 @@ You write a promise (what, deadline, proof, stake, and who receives it if you br
 
 `kept` and `broken` call `settleStake()` in `agent/wallet.ts` with `mocked: true` and no `txHash`. The page labels that settlement simulated.
 
-Promises live in `data/promises.json` locally, or under `/tmp` on Vercel (ephemeral). Cold starts can wipe them. The app does not seed sample promises.
+Promises are stored in Upstash Redis when its env vars are set, photos included (up to 700 KB each). Without Redis they go to `data/promises.json` locally, or `/tmp` on Vercel, where cold starts wipe them. `GET /api/promises` reports which one is in use as `meta.storage`. The app does not seed sample promises.
 
 
 ## Agent tools
@@ -112,6 +112,7 @@ npm run dev
 | `GEMINI_API_KEY` | Yes, for every check | [Google AI Studio](https://aistudio.google.com/apikey) |
 | `GEMINI_MODEL` | No | Default `gemini-3.6-flash` (tool calling and images) |
 | `GITHUB_TOKEN` | No | Public commits only; helps rate limits |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | No | Upstash Redis REST (set by the Vercel Marketplace integration). `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` also work. Without them promises go to a local file |
 | `WALLET_PRIVATE_KEY` | No | Week 3. Week 2 settlement does not sign or broadcast |
 
 Do not commit `.env`, `.agent-wallet.json`, or `data/`.
@@ -141,7 +142,6 @@ Live: https://proof-of-promise.vercel.app
 - Real USDC escrow on Base Sepolia: lock on create, refund on kept, pay the beneficiary on broken
 - x402 friend backing: friends pay to back a promise through `POST /api/promises/:id/back`
 - Strava OAuth behind `agent/proofs/strava.ts`
-- Persistent storage (Redis or Blob) instead of `/tmp`
 - Auto-post results to X
 
 ## Social

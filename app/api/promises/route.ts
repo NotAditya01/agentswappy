@@ -1,5 +1,5 @@
 import { MODEL } from "@/agent/model";
-import { createPromise, listPromises } from "@/lib/store";
+import { createPromise, listPromises, storageKind } from "@/lib/store";
 import { validateCreate } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -15,6 +15,7 @@ export async function GET() {
       hasGithubToken: Boolean(process.env.GITHUB_TOKEN),
       settlement: "mock",
       network: "base-sepolia",
+      storage: storageKind(),
     },
   });
 }
