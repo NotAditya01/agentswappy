@@ -5,9 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
+import { shrinkPhoto } from "@/lib/shrink";
 import type { PromiseRecord, TraceStep, Verdict } from "@/lib/types";
 
-const MAX_PHOTO_BYTES = 4_000_000;
 
 const TOOL_LABEL: Record<string, string> = {
   check_github_commits: "Looked up GitHub commits",
@@ -77,15 +77,11 @@ export function PromiseCard({
 
   async function upload(file: File | null) {
     if (!file) return;
-    if (file.size > MAX_PHOTO_BYTES) {
-      setUploadError("Image must be 4 MB or smaller.");
-      return;
-    }
     setUploading(true);
     setUploadError(null);
     try {
       const body = new FormData();
-      body.append("image", file);
+      body.append("image", await shrinkPhoto(file));
       const res = await fetch(`/api/promises/${promise.id}/proof`, { method: "POST", body });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed.");
@@ -132,7 +128,7 @@ export function PromiseCard({
               onChange={(event) => upload(event.target.files?.[0] ?? null)}
               className="text-base file:mr-3 file:text-sm"
             />
-            <span className="text-muted-foreground">JPEG, PNG, WebP, or GIF, up to 4 MB.</span>
+            <span className="text-muted-foreground">JPEG, PNG, WebP, or GIF. Large photos are shrunk first.</span>
             {uploadError && <span className="text-destructive">{uploadError}</span>}
           </label>
         )}

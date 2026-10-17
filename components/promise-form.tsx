@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, controlClass } from "@/components/field";
 import { toLocalInput } from "@/lib/format";
+import { MAX_RAW_PHOTO_BYTES, shrinkPhoto } from "@/lib/shrink";
 import type { PromiseDraft, ProofType } from "@/lib/types";
 
 const SIMULATED_REFUND = "0x1111111111111111111111111111111111111111";
 const SIMULATED_PAYOUT = "0x2222222222222222222222222222222222222222";
-const MAX_PHOTO_BYTES = 4_000_000;
 
 const PROOF_HELP: Record<ProofType, string> = {
   github_commits: "We look up public commits on the repository you name, from the start date through the deadline.",
@@ -126,11 +126,6 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
       };
     } else if (form.proofType === "image") {
       draft.image = { claim: form.claim };
-      if (file && file.size > MAX_PHOTO_BYTES) {
-        setError("Image must be 4 MB or smaller.");
-        setSaving(false);
-        return;
-      }
     } else {
       draft.strava = {
         activity: form.activity,
@@ -149,7 +144,7 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
 
       if (form.proofType === "image" && file) {
         const body = new FormData();
-        body.append("image", file);
+        body.append("image", await shrinkPhoto(file));
         const upload = await fetch(`/api/promises/${data.id}/proof`, { method: "POST", body });
         const uploaded = await upload.json();
         if (!upload.ok) throw new Error(uploaded.error || "The promise was saved, but the photo upload failed.");
@@ -254,14 +249,14 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
                   className={`${controlClass} min-h-24`}
                 />
               </Field>
-              <Field label="Photo" hint="JPEG, PNG, WebP, or GIF, up to 4 MB. You can add it later.">
+              <Field label="Photo" hint="JPEG, PNG, WebP, or GIF. Large photos are shrunk before upload. You can add it later.">
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={(event) => {
                     const next = event.target.files?.[0] ?? null;
-                    if (next && next.size > MAX_PHOTO_BYTES) {
-                      setError("Image must be 4 MB or smaller.");
+                    if (next && next.size > MAX_RAW_PHOTO_BYTES) {
+                      setError("Image must be 25 MB or smaller.");
                       setFile(null);
                       return;
                     }
