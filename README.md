@@ -6,7 +6,7 @@
 
 Stake USDC on a personal promise. Swappy checks your proof (GitHub, photo, Strava) and decides whether you get the stake back or it goes to a friend or charity.
 
-**Live:** https://proof-of-promise.vercel.app · **Demo video:** [YouTube](https://youtu.be/WDhPanZ4RVA)
+**Live:** https://proof-of-promise.vercel.app · **Demo video:** [YouTube](https://youtu.be/mULHLHCVfV4)
 
 ## The problem
 
@@ -19,7 +19,8 @@ Built for Rise In Agentmaxxing. Week 2: settlement is simulated (no real transfe
 - Make a promise with a deadline, a stake, a proof type, and who gets the money if you break it
 - Gemini agent calls a proof tool, reads the evidence and records `kept`, `broken` or `pending`
 - Live GitHub commit checks for a repo, author and date window
-- Photo proof checked with Gemini vision
+- Photo proof checked with Gemini vision. Photos are shrunk in the browser to under 650 KB before upload
+- Promises and photos saved in Upstash Redis, so they survive redeploys
 - Full trace on every card: tools called, evidence, verdict, settlement
 - Never slashes an unverified stake. Failed checks stay `pending`
 - Clear errors when Gemini is missing or busy (45s timeout per call, one retry)
@@ -90,6 +91,7 @@ Settlement (`settleStake` in `agent/wallet.ts`) runs after the verdict, outside 
 | Tailwind CSS | 4.3.3 |
 | Google Gen AI SDK (`@google/genai`) | 2.28.0 |
 | viem (Base Sepolia, week 3 signing) | 2.57.4 |
+| Upstash Redis (REST API via `fetch`, no SDK) | n/a |
 | Node.js | 20+ |
 | Hosting | Vercel (Node.js runtime) |
 
@@ -132,7 +134,7 @@ Past deadlines are allowed, so a GitHub window that already ended can be checked
 ## Demo links
 
 Week 1 (proofofpromise.v1): n/a  
-Week 2 (proofofpromise.v2): https://youtu.be/WDhPanZ4RVA  
+Week 2 (proofofpromise.v2): https://youtu.be/mULHLHCVfV4  
 Week 3 (proofofpromise.v3): coming soon
 
 Live: https://proof-of-promise.vercel.app
