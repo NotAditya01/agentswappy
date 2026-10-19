@@ -1,0 +1,13 @@
+{
+  "chainId": 84532,
+  "network": "base-sepolia",
+  "PromiseEscrow": {
+    "address": "0x0cb3d1093AeD5E812f2f4Fd1a3cF92f93868782d",
+    "deployTx": "0x8e4ba73b3cba491f08a4e507f0dca61210df9c16e62af1dfe74d244fff705bf6",
+    "block": 48314516,
+    "verified": "https://sepolia.basescan.org/address/0x0cb3d1093aed5e812f2f4fd1a3cf92f93868782d#code"
+  },
+  "usdc": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  "agent": "0x317888B8Bb6107416cD96C65Eda7D28805c89492",
+  "gracePeriod": 259200
+}
