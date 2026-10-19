@@ -7,3 +7,15 @@ data/
 next-env.d.ts
 *.tsbuildinfo
 .DS_Store
+
+# keys
+*.env
+.env.*
+!.env.example
+*.key
+pop-keys/
+
+# foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
