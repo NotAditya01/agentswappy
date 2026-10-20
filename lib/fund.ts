@@ -1,5 +1,6 @@
 import { createPublicClient, createWalletClient, custom, http, type Address, type EIP1193Provider, type Hex } from "viem";
 import { chain, ESCROW_ADDRESS, escrowAbi, escrowId, USDC_ADDRESS, usdcAbi, usdcUnits } from "./escrow";
+import { erc20TransferAbi, toUnits, type Transfer } from "./transfer";
 
 declare global {
   interface Window {
@@ -72,5 +73,23 @@ export async function fundPromise(input: {
   });
   const receipt = await reader.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error("The escrow transaction reverted.");
+  return hash;
+}
+
+export async function sendFromWallet(transfer: Transfer): Promise<Hex> {
+  const [from] = await createWalletClient({ chain, transport: custom(provider()) }).requestAddresses();
+  if (!from) throw new Error("The wallet did not share an address.");
+  const wallet = createWalletClient({ account: from, chain, transport: custom(provider()) });
+  const reader = createPublicClient({ chain, transport: http() });
+  if ((await wallet.getChainId()) !== chain.id) await wallet.switchChain({ id: chain.id });
+  if ((await wallet.getChainId()) !== chain.id) throw new Error("Switch your wallet to Base Sepolia first.");
+
+  const amount = toUnits(transfer.token, transfer.amount);
+  const hash =
+    transfer.token === "USDC"
+      ? await wallet.writeContract({ address: USDC_ADDRESS, abi: erc20TransferAbi, functionName: "transfer", args: [transfer.to, amount] })
+      : await wallet.sendTransaction({ to: transfer.to, value: amount });
+  const receipt = await reader.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`The transfer reverted. Tx ${hash}`);
   return hash;
 }
