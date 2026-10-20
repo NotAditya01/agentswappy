@@ -147,3 +147,19 @@ export async function sendFromWallet(transfer: Transfer, from: Address): Promise
   if (receipt.status !== "success") throw new Error(`The transfer reverted. Tx ${hash}`);
   return hash;
 }
+
+// Sends USDC into the escrow; the server then credits it to the promise.
+export async function sendBacking(amountUsdc: string, from: Address): Promise<Hex> {
+  const escrow = ESCROW_ADDRESS;
+  if (!escrow) throw new Error("The escrow is not configured.");
+  const wallet = createWalletClient({ account: from, chain, transport: custom(provider()) });
+  const reader = createPublicClient({ chain, transport: http() });
+  if ((await wallet.getChainId()) !== chain.id) await wallet.switchChain({ id: chain.id });
+  const amount = usdcUnits(amountUsdc);
+  const balance = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "balanceOf", args: [from] });
+  if (balance < amount) throw new Error("Not enough test USDC in this wallet. Get some from the Circle faucet.");
+  const hash = await wallet.writeContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "transfer", args: [escrow, amount] });
+  const receipt = await reader.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`The transfer reverted. Tx ${hash}`);
+  return hash;
+}

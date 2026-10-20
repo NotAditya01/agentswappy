@@ -95,6 +95,8 @@ export type StakeBackResult = {
   message: string;
 };
 
+export type Backing = { backer: string; amountUsdc: string; txHash: string; creditTx: string; at: string };
+
 export type PromiseRecord = {
   id: string;
   description: string;
@@ -114,6 +116,7 @@ export type PromiseRecord = {
   settlement: SettlementReceipt | null;
   onchain?: OnchainStake | null;
   walletStake?: boolean;
+  backings?: Backing[];
   imageProof: ImageProof | null;
   createdAt: string;
   checkedAt: string | null;

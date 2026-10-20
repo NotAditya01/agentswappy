@@ -14,6 +14,9 @@ export const escrowAbi = parseAbi([
   "function createPromise(bytes32 id, address beneficiary, uint256 amount, uint64 deadline)",
   "function createPromiseWithPermit(bytes32 id, address beneficiary, uint256 amount, uint64 deadline, uint256 permitDeadline, uint8 v, bytes32 r, bytes32 s)",
   "function settle(bytes32 id, bool kept)",
+  "function creditBacking(bytes32 id, address backer, uint256 amount, bytes32 x402TxHash)",
+  "function paymentCredited(bytes32 txHash) view returns (bool)",
+  "event Backed(bytes32 indexed id, address indexed backer, uint256 amount, bytes32 x402TxHash)",
   "function getPromise(bytes32 id) view returns (PromiseData)",
   "event PromiseCreated(bytes32 indexed id, address indexed maker, address indexed beneficiary, uint256 amount, uint64 deadline)",
   "event Refunded(bytes32 indexed id, address indexed to, uint256 amount)",
@@ -25,6 +28,8 @@ export const usdcAbi = parseAbi([
   "function approve(address spender, uint256 amount) returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
   "function balanceOf(address owner) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "event Transfer(address indexed from, address indexed to, uint256 value)",
 ]);
 
 export const STATUS_OPEN = 1;
