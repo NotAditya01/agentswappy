@@ -38,12 +38,22 @@ export async function creditWalletBacking(promiseId: string, txHash: string): Pr
 
   const account = privateKeyToAccount(key as Hex);
   const wallet = createWalletClient({ account, chain, transport: http(process.env.BASE_SEPOLIA_RPC || undefined) });
-  const creditTx = await wallet.writeContract({
-    address: escrow,
-    abi: escrowAbi,
-    functionName: "creditBacking",
-    args: [id, sent.from, sent.value, txHash as Hex],
-  });
+  // Right after the transfer, the RPC may not see the new escrow balance yet.
+  let creditTx: Hex | undefined;
+  for (let tries = 0; !creditTx; tries++) {
+    try {
+      creditTx = await wallet.writeContract({
+        address: escrow,
+        abi: escrowAbi,
+        functionName: "creditBacking",
+        args: [id, sent.from, sent.value, txHash as Hex],
+      });
+    } catch (err) {
+      const lagging = /0xcd7f3d37|NotEnoughUnattributed/.test(String((err as Error)?.message));
+      if (!lagging || tries >= 5) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
   const credited = await client.waitForTransactionReceipt({ hash: creditTx });
   if (credited.status !== "success") throw new BackingError(`Crediting the backing reverted. Tx ${creditTx}`, 502);
 
