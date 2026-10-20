@@ -7,6 +7,8 @@ import { chain } from "@/lib/escrow";
 export function WalletButton() {
   const { installed, account, chainId, usdc, connecting, error, connect } = useWallet();
 
+  if (installed === null) return <div className="h-8" />;
+
   if (!installed) {
     return <p className="text-sm text-muted-foreground">No browser wallet found. Install Coinbase Wallet or MetaMask to connect.</p>;
   }

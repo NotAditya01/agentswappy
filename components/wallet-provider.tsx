@@ -5,7 +5,7 @@ import { createPublicClient, formatUnits, getAddress, http, type Address } from 
 import { chain, USDC_ADDRESS, usdcAbi } from "@/lib/escrow";
 
 type WalletState = {
-  installed: boolean;
+  installed: boolean | null;
   account: Address | null;
   chainId: number | null;
   usdc: string | null;
@@ -43,7 +43,7 @@ async function ensureBaseSepolia() {
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  const [installed, setInstalled] = useState(false);
+  const [installed, setInstalled] = useState<boolean | null>(null);
   const [account, setAccount] = useState<Address | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [usdc, setUsdc] = useState<string | null>(null);

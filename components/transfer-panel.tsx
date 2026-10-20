@@ -119,7 +119,7 @@ export function TransferPanel() {
                 Swappy&apos;s wallet {review.agentAddress ? `(${short(review.agentAddress)})` : "(not set up)"}
               </label>
               <label className="flex items-center gap-2">
-                <input type="radio" checked={sender === "wallet"} disabled={!installed} onChange={() => setSender("wallet")} />
+                <input type="radio" checked={sender === "wallet"} disabled={installed !== true} onChange={() => setSender("wallet")} />
                 Your wallet {!installed ? "(no browser wallet found)" : account ? `(${short(account)}, you sign it)` : "(you sign it)"}
               </label>
             </dd>
