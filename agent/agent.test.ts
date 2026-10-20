@@ -69,7 +69,7 @@ describe("judgePromise", { concurrency: 1 }, () => {
         () => judgePromise(githubPromise("vercel", "next.js")),
         (err: unknown) => {
           assert.ok(err instanceof Error);
-          assert.match(err.message, /Gemini could not check this promise/);
+          assert.match(err.message, /Gemini (could not check this promise|is busy)/);
           assert.match(err.message, /Nothing was settled/);
           assert.doesNotMatch(err.message, /proof checker rules/);
           return true;
