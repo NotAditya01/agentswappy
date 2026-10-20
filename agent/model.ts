@@ -15,6 +15,13 @@ export function geminiFailure(prefix: string, err: unknown): Error {
   return new Error(`${prefix} ${cleaned} Nothing was settled.`);
 }
 
+export const GEMINI_DAILY_QUOTA = "Gemini's daily free quota for this app is used up. It resets within a day. Nothing was settled.";
+
+function isDailyQuota(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /PerDay/i.test(message);
+}
+
 export const GEMINI_BUSY = "Gemini is busy right now. Try again in a minute. Nothing was settled.";
 
 const CALL_TIMEOUT_MS = 45_000;
@@ -55,6 +62,7 @@ export async function callGemini<T>(call: (signal: AbortSignal) => Promise<T>, d
     try {
       return await attempt(call, timeoutMs);
     } catch (err) {
+      if (isDailyQuota(err)) throw new Error(GEMINI_DAILY_QUOTA);
       if (!isRetryable(err)) throw err;
       if (tries >= 1 || budget() < RETRY_DELAY_MS + 2_000) throw new Error(GEMINI_BUSY);
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
