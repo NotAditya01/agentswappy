@@ -9,7 +9,7 @@ type Meta = {
   hasApiKey: boolean;
   model: string;
   hasGithubToken: boolean;
-  settlement: "mock";
+  settlement: "mock" | "escrow";
   network: "base-sepolia";
 };
 
@@ -59,7 +59,11 @@ export function Dashboard() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:py-12">
       <header className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">Settlement is simulated. No real money moves.</p>
+        <p className="text-sm text-muted-foreground">
+          {meta?.settlement === "escrow"
+            ? "Base Sepolia testnet. Connect a wallet to lock test USDC, or leave it off to simulate."
+            : "Settlement is simulated. No real money moves."}
+        </p>
         <div className="flex items-center gap-3">
           <img src="/logo.png" alt="Swappy" width={44} height={44} className="size-11" />
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Proof of Promise</h1>

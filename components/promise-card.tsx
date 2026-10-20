@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
+import { txUrl } from "@/lib/escrow";
 import { shrinkPhoto } from "@/lib/shrink";
 import type { PromiseRecord, TraceStep, Verdict } from "@/lib/types";
 
@@ -14,7 +15,7 @@ const TOOL_LABEL: Record<string, string> = {
   check_image_proof: "Looked at the photo",
   check_strava_activity: "Checked Strava",
   record_verdict: "Wrote the verdict",
-  settle_stake: "Simulated settlement",
+  settle_stake: "Settled the stake",
 };
 
 function verdictVariant(verdict: Verdict | null): "default" | "destructive" | "outline" | "secondary" {
@@ -107,8 +108,10 @@ export function PromiseCard({
           <Meta label="Proof" value={promise.target} />
           <Meta label="Deadline" value={`${formatWhen(promise.deadline)} · ${dueLabel(promise.deadline)}`} />
           <Meta label="If broken, it goes to" value={promise.beneficiaryName} />
-          <Meta label="Stake" value={`${formatUsdc(promise.stakeUsdc)} USDC, simulated`} />
+          <Meta label="Stake" value={`${formatUsdc(promise.stakeUsdc)} USDC, ${promise.onchain ? "locked in escrow" : "simulated"}`} />
         </dl>
+
+        {promise.onchain && <TxLink label="Stake locked" hash={promise.onchain.createTx} />}
 
         {promise.proofType === "image" && promise.imageProof && (
           <img
@@ -162,7 +165,19 @@ export function PromiseCard({
           </div>
         )}
 
-        {promise.settlement && (
+        {promise.settlement && !promise.settlement.mocked && (
+          <div className="flex flex-col gap-1 border px-3 py-3 text-sm">
+            <p className="font-medium">Settled on Base Sepolia</p>
+            <p>
+              {promise.settlement.outcome === "refund"
+                ? `${formatUsdc(promise.settlement.amount)} USDC went back to you.`
+                : `${formatUsdc(promise.settlement.amount)} USDC went to ${promise.beneficiaryName}.`}
+            </p>
+            {promise.settlement.txHash && <TxLink label="Settlement" hash={promise.settlement.txHash} />}
+          </div>
+        )}
+
+        {promise.settlement?.mocked && (
           <div className="flex flex-col gap-1 border px-3 py-3 text-sm">
             <p className="font-medium">Simulated settlement</p>
             <p>
@@ -181,7 +196,7 @@ export function PromiseCard({
 }
 
 function AgentRun({ steps }: { steps: TraceStep[] }) {
-  const shown = steps.filter((step) => step.tool !== "settle_stake");
+  const shown = steps.filter((step) => step.tool !== "settle_stake" || !isMocked(step.result));
   if (shown.length === 0) return null;
 
   return (
@@ -200,6 +215,7 @@ function AgentRun({ steps }: { steps: TraceStep[] }) {
               </p>
               <p className="font-mono text-xs text-muted-foreground break-all">{step.tool}</p>
               {summary && <p>{summary}</p>}
+              {txHashOf(step.result) && <TxLink label="Transaction" hash={txHashOf(step.result)!} />}
               {facts.length > 0 && (
                 <dl className="grid gap-1">
                   {facts.map((fact) => (
@@ -222,6 +238,28 @@ function AgentRun({ steps }: { steps: TraceStep[] }) {
         })}
       </ol>
     </div>
+  );
+}
+
+function isMocked(result: unknown): boolean {
+  return Boolean(result && typeof result === "object" && (result as { mocked?: unknown }).mocked !== false);
+}
+
+function txHashOf(result: unknown): string | null {
+  if (!result || typeof result !== "object") return null;
+  const hash = (result as { txHash?: unknown }).txHash;
+  return typeof hash === "string" ? hash : null;
+}
+
+function TxLink({ label, hash }: { label: string; hash: string }) {
+  return (
+    <p className="text-sm">
+      <span className="text-muted-foreground">{label}: </span>
+      <a href={txUrl(hash)} target="_blank" rel="noreferrer" className="font-mono break-all underline">
+        {hash.slice(0, 10)}…{hash.slice(-8)}
+      </a>{" "}
+      on BaseScan
+    </p>
   );
 }
 
