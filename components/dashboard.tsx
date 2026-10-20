@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { PromiseCard } from "@/components/promise-card";
 import { PromiseForm } from "@/components/promise-form";
-import { TransferPanel } from "@/components/transfer-panel";
+import { AskSwappy } from "@/components/ask-swappy";
+import type { PromisePrefill } from "@/lib/intent";
 import { WalletButton } from "@/components/wallet-button";
 import type { PromiseRecord } from "@/lib/types";
 
@@ -36,6 +37,13 @@ export function Dashboard() {
       .catch(() => setError("Could not load promises."))
       .finally(() => setLoading(false));
   }, []);
+
+  const [prefill, setPrefill] = useState<{ value: PromisePrefill; key: number } | null>(null);
+
+  function fillForm(value: PromisePrefill) {
+    setPrefill({ value, key: Date.now() });
+    setTimeout(() => document.getElementById("promise-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   async function onCreated() {
     await refresh();
@@ -87,9 +95,11 @@ export function Dashboard() {
         </p>
       )}
 
-      <PromiseForm onCreated={onCreated} />
+      <AskSwappy onPrefill={fillForm} onChanged={refresh} />
 
-      <TransferPanel />
+      <div id="promise-form" className="scroll-mt-6">
+        <PromiseForm onCreated={onCreated} prefill={prefill} />
+      </div>
 
       <section id="promises" className="flex flex-col gap-4 scroll-mt-6">
         <div>
