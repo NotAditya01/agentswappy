@@ -139,6 +139,7 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
       makerAddress: account ?? SIMULATED_REFUND,
       beneficiaryName: form.beneficiaryName,
       beneficiaryAddress: account ? form.beneficiaryAddress.trim() : SIMULATED_PAYOUT,
+      ...(account ? { walletStake: true } : {}),
     };
 
     if (form.proofType === "github_commits") {

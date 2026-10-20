@@ -37,6 +37,7 @@ function draftToRecord(input: CreatePromiseInput): PromiseRecord {
     decidedBy: null,
     trace: [],
     settlement: null,
+    walletStake: input.walletStake || undefined,
     imageProof: null,
     createdAt: new Date().toISOString(),
     checkedAt: null,

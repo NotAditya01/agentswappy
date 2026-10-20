@@ -89,6 +89,7 @@ export function validateCreate(body: unknown): { ok: true; value: CreatePromiseI
         makerAddress,
         beneficiaryName,
         beneficiaryAddress,
+        walletStake: draft.walletStake === true,
         criteria,
       },
     };
@@ -108,6 +109,7 @@ export function validateCreate(body: unknown): { ok: true; value: CreatePromiseI
         makerAddress,
         beneficiaryName,
         beneficiaryAddress,
+        walletStake: draft.walletStake === true,
         criteria: { claim },
       },
     };
@@ -134,6 +136,7 @@ export function validateCreate(body: unknown): { ok: true; value: CreatePromiseI
       makerAddress,
       beneficiaryName,
       beneficiaryAddress,
+      walletStake: draft.walletStake === true,
       criteria: { activity, ...(minDistanceKm ? { minDistanceKm } : {}) },
     },
   };

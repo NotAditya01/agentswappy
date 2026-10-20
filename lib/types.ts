@@ -113,6 +113,7 @@ export type PromiseRecord = {
   trace: TraceStep[];
   settlement: SettlementReceipt | null;
   onchain?: OnchainStake | null;
+  walletStake?: boolean;
   imageProof: ImageProof | null;
   createdAt: string;
   checkedAt: string | null;
@@ -138,6 +139,7 @@ export type PromiseDraft = {
   };
   image?: { claim: string };
   strava?: { activity: string; minDistanceKm?: number };
+  walletStake?: boolean;
 };
 
 export type CreatePromiseInput = {
@@ -150,4 +152,5 @@ export type CreatePromiseInput = {
   beneficiaryName: string;
   beneficiaryAddress: string;
   criteria: PromiseCriteria;
+  walletStake?: boolean;
 };

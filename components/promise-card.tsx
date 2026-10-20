@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
 import { txUrl } from "@/lib/escrow";
+import { needsOnchainSettle } from "@/lib/stake";
 import { shrinkPhoto } from "@/lib/shrink";
 import type { PromiseRecord, TraceStep, Verdict } from "@/lib/types";
 
@@ -141,8 +142,8 @@ export function PromiseCard({
             <p className="text-sm text-muted-foreground">Step 3</p>
             <p className="font-medium">Check proof</p>
           </div>
-          <Button type="button" disabled={settled || checking} onClick={() => onCheck(promise.id)} className="h-11 w-full sm:w-auto">
-            {checking ? "Checking…" : settled ? "Checked" : promise.verdict === "pending" ? "Check again" : "Check proof"}
+          <Button type="button" disabled={(settled && !needsOnchainSettle(promise)) || checking} onClick={() => onCheck(promise.id)} className="h-11 w-full sm:w-auto">
+            {checking ? "Checking…" : needsOnchainSettle(promise) ? "Settle in escrow" : settled ? "Checked" : promise.verdict === "pending" ? "Check again" : "Check proof"}
           </Button>
         </div>
 
