@@ -113,6 +113,9 @@ export function PromiseCard({
         </dl>
 
         {promise.onchain && <TxLink label="Stake locked" hash={promise.onchain.createTx} />}
+        {promise.backings?.map((b) => (
+          <TxLink key={b.creditTx} label={`Backed with ${formatUsdc(b.amountUsdc)} USDC`} hash={b.creditTx} />
+        ))}
 
         {promise.proofType === "image" && promise.imageProof && (
           <img

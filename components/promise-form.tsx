@@ -12,6 +12,7 @@ import { useWallet } from "@/components/wallet-provider";
 import { MAX_RAW_PHOTO_BYTES, shrinkPhoto } from "@/lib/shrink";
 import { isAddress } from "viem";
 import type { PromiseDraft, ProofType } from "@/lib/types";
+import type { PromisePrefill } from "@/lib/intent";
 
 const SIMULATED_REFUND = "0x1111111111111111111111111111111111111111";
 const SIMULATED_PAYOUT = "0x2222222222222222222222222222222222222222";
@@ -81,7 +82,7 @@ function parseRepo(input: string): { owner: string; repo: string } | null {
   return { owner: parts[0], repo: parts[1] };
 }
 
-export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
+export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<void>; prefill?: { value: PromisePrefill; key: number } | null }) {
   const [form, setForm] = useState(blankForm);
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -92,6 +93,25 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
   const [step, setStep] = useState<string | null>(null);
 
   useEffect(() => setWalletAvailable(hasWallet()), []);
+
+  useEffect(() => {
+    if (!prefill) return;
+    const p = prefill.value;
+    setForm({
+      ...blankForm(),
+      description: p.description,
+      deadline: toLocalInput(new Date(p.deadline)),
+      proofType: p.proofType,
+      stakeUsdc: p.stakeUsdc,
+      beneficiaryName: p.beneficiaryName,
+      beneficiaryAddress: p.beneficiaryAddress,
+      repo: p.repo,
+      minCommits: p.minCommits,
+      claim: p.claim,
+    });
+    setExampleNote(false);
+    setError(null);
+  }, [prefill]);
 
   async function connect() {
     setError(null);
