@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PromiseCard } from "@/components/promise-card";
 import { PromiseForm } from "@/components/promise-form";
 import { TransferPanel } from "@/components/transfer-panel";
+import { WalletButton } from "@/components/wallet-button";
 import type { PromiseRecord } from "@/lib/types";
 
 type Meta = {
@@ -69,6 +70,7 @@ export function Dashboard() {
           <img src="/logo.png" alt="Swappy" width={44} height={44} className="size-11" />
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Proof of Promise</h1>
         </div>
+        <WalletButton />
         <p className="text-base text-muted-foreground">
           Make a promise, find it in the list, then check the proof. Swappy, the agent, calls a tool, reads the result, and decides if you kept it.
         </p>
