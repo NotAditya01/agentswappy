@@ -55,21 +55,29 @@ export type SettlementOutcome = "refund" | "forfeit";
 export type SettlementReceipt = {
   id: string;
   promiseId: string;
-  mocked: true;
+  mocked: boolean;
   network: "base-sepolia";
   asset: "USDC";
   amount: string;
   outcome: SettlementOutcome;
-  fromLabel: "mock-escrow";
+  fromLabel: "mock-escrow" | "escrow";
   to: string;
   toLabel: string;
-  txHash: null;
+  txHash: `0x${string}` | null;
+  payouts?: { to: string; amount: string }[];
   createdAt: string;
   note: string;
 };
 
+export type OnchainStake = {
+  escrowId: `0x${string}`;
+  createTx: `0x${string}`;
+  maker: string;
+};
+
 export type SettlementIntent = {
   promiseId: string;
+  onchain: OnchainStake | null;
   verdict: "kept" | "broken";
   amountUsdc: string;
   makerAddress: string;
@@ -104,6 +112,7 @@ export type PromiseRecord = {
   decidedBy: DecidedBy | null;
   trace: TraceStep[];
   settlement: SettlementReceipt | null;
+  onchain?: OnchainStake | null;
   imageProof: ImageProof | null;
   createdAt: string;
   checkedAt: string | null;
