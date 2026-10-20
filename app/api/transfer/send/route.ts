@@ -1,6 +1,7 @@
 import { sendFromAgent } from "@/agent/transfer";
 import { txUrl } from "@/lib/escrow";
-import { validateTransfer } from "@/lib/transfer";
+import { clientIp, takeSendSlot } from "@/lib/ratelimit";
+import { overAgentCap, validateTransfer } from "@/lib/transfer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,17 @@ export async function POST(req: Request) {
   }
   const checked = validateTransfer({ token: body.token, amount: body.amount, to: body.to, network: body.network });
   if (!checked.ok) return Response.json({ error: checked.error }, { status: 400 });
+  if (overAgentCap(checked.transfer)) {
+    return Response.json({ error: "That is over the agent wallet's per-transfer cap. Nothing was sent." }, { status: 400 });
+  }
+
+  let slot;
+  try {
+    slot = await takeSendSlot(clientIp(req));
+  } catch {
+    return Response.json({ error: "Could not check the send limit, so nothing was sent. Try again soon." }, { status: 503 });
+  }
+  if (!slot.ok) return Response.json({ error: `${slot.error} Nothing was sent.` }, { status: 429 });
 
   try {
     const { hash, from } = await sendFromAgent(checked.transfer);
