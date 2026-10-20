@@ -7,9 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Field, controlClass } from "@/components/field";
 import { toLocalInput } from "@/lib/format";
 import { FAUCET_URL } from "@/lib/escrow";
-import { connectWallet, fundPromise, hasWallet } from "@/lib/fund";
+import { fundPromise, hasWallet } from "@/lib/fund";
+import { useWallet } from "@/components/wallet-provider";
 import { MAX_RAW_PHOTO_BYTES, shrinkPhoto } from "@/lib/shrink";
-import { isAddress, type Address } from "viem";
+import { isAddress } from "viem";
 import type { PromiseDraft, ProofType } from "@/lib/types";
 
 const SIMULATED_REFUND = "0x1111111111111111111111111111111111111111";
@@ -87,18 +88,14 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
   const [error, setError] = useState<string | null>(null);
   const [exampleNote, setExampleNote] = useState(false);
   const [walletAvailable, setWalletAvailable] = useState(false);
-  const [account, setAccount] = useState<Address | null>(null);
+  const { account, connect: connectShared, refreshBalance, error: walletError } = useWallet();
   const [step, setStep] = useState<string | null>(null);
 
   useEffect(() => setWalletAvailable(hasWallet()), []);
 
   async function connect() {
     setError(null);
-    try {
-      setAccount(await connectWallet());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
+    await connectShared();
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -191,6 +188,7 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
         });
         const stakedData = await staked.json();
         if (!staked.ok) throw new Error(stakedData.error || "The stake was sent, but the app could not confirm it.");
+        await refreshBalance();
       }
 
       if (form.proofType === "image" && file) {
@@ -364,6 +362,9 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
                 <Button type="button" variant="outline" onClick={connect} className="h-11">
                   Connect wallet
                 </Button>
+              )}
+              {!account && walletError && (
+                <span className="text-destructive">{walletError}</span>
               )}
             </div>
           )}

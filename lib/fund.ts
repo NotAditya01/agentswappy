@@ -17,13 +17,6 @@ export function hasWallet(): boolean {
   return typeof window !== "undefined" && Boolean(window.ethereum) && Boolean(ESCROW_ADDRESS);
 }
 
-export async function connectWallet(): Promise<Address> {
-  const wallet = createWalletClient({ chain, transport: custom(provider()) });
-  const [address] = await wallet.requestAddresses();
-  if (!address) throw new Error("The wallet did not share an address.");
-  return address;
-}
-
 export async function fundPromise(input: {
   promiseId: string;
   maker: Address;
@@ -76,9 +69,7 @@ export async function fundPromise(input: {
   return hash;
 }
 
-export async function sendFromWallet(transfer: Transfer): Promise<Hex> {
-  const [from] = await createWalletClient({ chain, transport: custom(provider()) }).requestAddresses();
-  if (!from) throw new Error("The wallet did not share an address.");
+export async function sendFromWallet(transfer: Transfer, from: Address): Promise<Hex> {
   const wallet = createWalletClient({ account: from, chain, transport: custom(provider()) });
   const reader = createPublicClient({ chain, transport: http() });
   if ((await wallet.getChainId()) !== chain.id) await wallet.switchChain({ id: chain.id });
