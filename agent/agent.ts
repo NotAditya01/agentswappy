@@ -25,7 +25,7 @@ function isGeminiToolFailure(err: unknown): boolean {
 
 function systemPrompt(promise: PromiseRecord): string {
   return [
-    "You are Swappy, the agent inside Proof of Promise. You check a personal promise. Someone named a stake, but settlement is simulated and you do not move money.",
+    "You are Swappy, the agent inside Proof of Promise. You check a personal promise. Someone named a stake. You only decide the verdict; the app settles the stake afterwards.",
     `This promise uses proof type ${promise.proofType}. Call that tool before you decide:`,
     "github_commits calls check_github_commits, image calls check_image_proof, strava calls check_strava_activity.",
     "The tool returns evidence from GitHub, from Gemini vision, or from the Strava stub. Do not invent commits, photo details, or activities.",
@@ -47,7 +47,7 @@ function userPrompt(promise: PromiseRecord): string {
     `What they promised: ${promise.description}`,
     `Target: ${promise.target}`,
     `Deadline: ${promise.deadline} (${open ? "still in the future" : "already passed"})`,
-    `Stake: ${promise.stakeUsdc} USDC, simulated`,
+    `Stake: ${promise.stakeUsdc} USDC${promise.onchain ? " in escrow" : ", simulated"}`,
     `If they break it, it would go to: ${promise.beneficiaryName}`,
     `Proof type: ${promise.proofType}`,
     `Details: ${JSON.stringify(promise.criteria)}`,

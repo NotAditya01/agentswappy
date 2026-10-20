@@ -1,19 +1,21 @@
-import fs from "fs";
-import os from "os";
-import path from "path";
-import { verifyMessage, type Address, type Hex } from "viem";
+import {
+  createPublicClient,
+  createWalletClient,
+  formatUnits,
+  http,
+  parseEventLogs,
+  verifyMessage,
+  type Address,
+  type Hex,
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { chain, ESCROW_ADDRESS, escrowAbi, STATUS_OPEN } from "@/lib/escrow";
 import type { SettlementIntent, SettlementReceipt, StakeBackResult } from "@/lib/types";
-
-const WALLET_DIR = process.env.VERCEL
-  ? path.join(os.tmpdir(), "proof-of-promise")
-  : process.cwd();
-const WALLET_FILE = path.join(WALLET_DIR, ".agent-wallet.json");
 
 export type Payment = { from: Address; to: Address; amount: string; asset: string; resource: string; nonce: string };
 
 function loadAccount() {
-  const key = process.env.WALLET_PRIVATE_KEY || (fs.existsSync(WALLET_FILE) && JSON.parse(fs.readFileSync(WALLET_FILE, "utf8")).privateKey);
+  const key = process.env.WALLET_PRIVATE_KEY;
   return key ? privateKeyToAccount(key as Hex) : null;
 }
 
@@ -91,10 +93,59 @@ export class MockStakeSettler implements StakeSettler {
   }
 }
 
-export const stakeSettler: StakeSettler = new MockStakeSettler();
+export function publicClient() {
+  return createPublicClient({ chain, transport: http(process.env.BASE_SEPOLIA_RPC || undefined) });
+}
+
+export class EscrowStakeSettler implements StakeSettler {
+  async settle(intent: SettlementIntent): Promise<SettlementReceipt> {
+    if (!intent.onchain || !ESCROW_ADDRESS) throw new Error("This promise has no stake in the escrow.");
+    const account = requireAccount();
+    const client = publicClient();
+    const wallet = createWalletClient({ account, chain, transport: http(process.env.BASE_SEPOLIA_RPC || undefined) });
+    const id = intent.onchain.escrowId;
+    const kept = intent.verdict === "kept";
+
+    const current = await client.readContract({ address: ESCROW_ADDRESS, abi: escrowAbi, functionName: "getPromise", args: [id] });
+    if (current.status !== STATUS_OPEN) throw new Error("The escrow says this stake is already closed. Nothing was sent.");
+
+    const hash = await wallet.writeContract({ address: ESCROW_ADDRESS, abi: escrowAbi, functionName: "settle", args: [id, kept] });
+    const receipt = await client.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error(`Settlement transaction ${hash} reverted.`);
+
+    const logs = parseEventLogs({ abi: escrowAbi, logs: receipt.logs, eventName: kept ? "Refunded" : "Forfeited" });
+    const payouts = logs.map((log) =>
+      log.eventName === "Refunded"
+        ? { to: log.args.to, amount: formatUnits(log.args.amount, 6) }
+        : { to: (log.args as { beneficiary: Address }).beneficiary, amount: formatUnits((log.args as { total: bigint }).total, 6) },
+    );
+
+    return {
+      id: `set_${hash}`,
+      promiseId: intent.promiseId,
+      mocked: false,
+      network: "base-sepolia",
+      asset: "USDC",
+      amount: intent.amountUsdc,
+      outcome: kept ? "refund" : "forfeit",
+      fromLabel: "escrow",
+      to: kept ? intent.onchain.maker : intent.beneficiaryAddress,
+      toLabel: kept ? "maker" : intent.beneficiaryName,
+      txHash: hash,
+      payouts,
+      createdAt: new Date().toISOString(),
+      note: kept ? "The escrow refunded the stake." : `The escrow paid the stake to ${intent.beneficiaryName}.`,
+    };
+  }
+}
+
+export function escrowReady(): boolean {
+  return Boolean(ESCROW_ADDRESS && process.env.WALLET_PRIVATE_KEY);
+}
 
 export function settleStake(intent: SettlementIntent): Promise<SettlementReceipt> {
-  return stakeSettler.settle(intent);
+  const settler: StakeSettler = intent.onchain && escrowReady() ? new EscrowStakeSettler() : new MockStakeSettler();
+  return settler.settle(intent);
 }
 
 export interface StakeBacker {

@@ -1,4 +1,5 @@
 import { MODEL } from "@/agent/model";
+import { escrowReady } from "@/agent/wallet";
 import { createPromise, listPromises, storageKind } from "@/lib/store";
 import { validateCreate } from "@/lib/validate";
 
@@ -13,7 +14,7 @@ export async function GET() {
       hasApiKey: Boolean(process.env.GEMINI_API_KEY),
       model: MODEL,
       hasGithubToken: Boolean(process.env.GITHUB_TOKEN),
-      settlement: "mock",
+      settlement: escrowReady() ? "escrow" : "mock",
       network: "base-sepolia",
       storage: storageKind(),
     },

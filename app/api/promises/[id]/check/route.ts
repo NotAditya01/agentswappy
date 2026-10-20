@@ -30,6 +30,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     if (judgment.verdict === "kept" || judgment.verdict === "broken") {
       const settlement = await settleStake({
         promiseId: id,
+        onchain: started.promise.onchain ?? null,
         verdict: judgment.verdict,
         amountUsdc: started.promise.stakeUsdc,
         makerAddress: started.promise.makerAddress,
@@ -38,7 +39,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       });
       trace.push({
         tool: "settle_stake",
-        args: { verdict: judgment.verdict, amountUsdc: started.promise.stakeUsdc, to: settlement.to, outcome: settlement.outcome },
+        args: { verdict: judgment.verdict, amountUsdc: started.promise.stakeUsdc, to: settlement.to, outcome: settlement.outcome, escrowId: started.promise.onchain?.escrowId ?? null },
         result: settlement,
       });
       patch.settlement = settlement;
