@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PromiseCard } from "@/components/promise-card";
 import { PromiseForm } from "@/components/promise-form";
+import { TransferPanel } from "@/components/transfer-panel";
 import type { PromiseRecord } from "@/lib/types";
 
 type Meta = {
@@ -85,6 +86,8 @@ export function Dashboard() {
       )}
 
       <PromiseForm onCreated={onCreated} />
+
+      <TransferPanel />
 
       <section id="promises" className="flex flex-col gap-4 scroll-mt-6">
         <div>
