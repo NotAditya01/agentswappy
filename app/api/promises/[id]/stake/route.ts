@@ -31,7 +31,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   );
   if (!created) return Response.json({ error: "That transaction did not create this promise in the escrow." }, { status: 400 });
 
-  const onchain = await client.readContract({ address: escrow, abi: escrowAbi, functionName: "getPromise", args: [key] });
+  let onchain = await client.readContract({ address: escrow, abi: escrowAbi, functionName: "getPromise", args: [key] });
+  for (let i = 0; i < 10 && onchain.status !== STATUS_OPEN; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    onchain = await client.readContract({ address: escrow, abi: escrowAbi, functionName: "getPromise", args: [key] });
+  }
   if (
     onchain.status !== STATUS_OPEN ||
     getAddress(onchain.maker) !== promise.makerAddress ||
