@@ -12,6 +12,7 @@ export const FAUCET_URL = "https://faucet.circle.com";
 export const escrowAbi = parseAbi([
   "struct PromiseData { address maker; uint64 deadline; uint8 status; address beneficiary; uint128 makerStake; uint128 backedTotal; }",
   "function createPromise(bytes32 id, address beneficiary, uint256 amount, uint64 deadline)",
+  "function createPromiseWithPermit(bytes32 id, address beneficiary, uint256 amount, uint64 deadline, uint256 permitDeadline, uint8 v, bytes32 r, bytes32 s)",
   "function settle(bytes32 id, bool kept)",
   "function getPromise(bytes32 id) view returns (PromiseData)",
   "event PromiseCreated(bytes32 indexed id, address indexed maker, address indexed beneficiary, uint256 amount, uint64 deadline)",
