@@ -34,9 +34,20 @@ export function findPromise(target: string, promises: PromiseRecord[]): PromiseR
   if (byId.length) return byId;
   const exact = promises.filter((p) => p.description.toLowerCase() === wanted);
   if (exact.length) return exact;
-  const words = wanted.split(/\s+/).filter((w) => w.length > 2);
+  const words = wanted.split(/[^a-z0-9/._-]+/).map(stem).filter((w) => w.length > 2 && !FILLER.has(w));
   if (!words.length) return [];
-  return promises.filter((p) => words.every((w) => p.description.toLowerCase().includes(w)));
+  const scored = promises.map((p) => {
+    const text = p.description.toLowerCase();
+    return { p, score: words.filter((w) => text.includes(w)).length };
+  });
+  const best = Math.max(0, ...scored.map((s) => s.score));
+  return best === 0 ? [] : scored.filter((s) => s.score === best).map((s) => s.p);
+}
+
+const FILLER = new Set(["the", "promise", "my", "that", "this", "one", "for", "with", "back", "usdc", "about", "his", "her"]);
+
+function stem(word: string): string {
+  return word.length > 4 && word.endsWith("s") ? word.slice(0, -1) : word;
 }
 
 export function toIntent(raw: Record<string, unknown>, promises: PromiseRecord[], now = Date.now()): Intent {

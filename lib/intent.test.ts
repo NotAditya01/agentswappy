@@ -47,6 +47,8 @@ test("back_promise resolves by id or title", () => {
   assert.equal(byId.kind === "back_promise" && byId.promise.id, "bbbb-2222");
   const byTitle = toIntent({ intent: "back_promise", target: "agentswappy commits", amount: "2" }, list, now);
   assert.equal(byTitle.kind === "back_promise" && byTitle.amountUsdc, "2.00");
+  const loose = toIntent({ intent: "back_promise", target: "the agentswappy commits promise", amount: "1" }, list, now);
+  assert.equal(loose.kind === "back_promise" && loose.promise.id, "aaaa-1111");
 });
 
 test("back_promise asks when it is ambiguous, unknown or not in the escrow", () => {
