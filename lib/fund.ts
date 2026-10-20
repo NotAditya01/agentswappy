@@ -1,5 +1,19 @@
-import { createPublicClient, createWalletClient, custom, http, type Address, type EIP1193Provider, type Hex } from "viem";
+import {
+  createPublicClient,
+  createWalletClient,
+  custom,
+  http,
+  type Account,
+  type Address,
+  type Chain,
+  type EIP1193Provider,
+  type Hex,
+  type Transport,
+  type WalletClient,
+} from "viem";
 import { chain, ESCROW_ADDRESS, escrowAbi, escrowId, USDC_ADDRESS, usdcAbi, usdcUnits } from "./escrow";
+import { chooseFundPath, isUserRejection } from "./fund-path";
+import { escrowHasPermit, signPermit, usdcHasPermit, type Reader } from "./permit";
 import { erc20TransferAbi, toUnits, type Transfer } from "./transfer";
 
 declare global {
@@ -17,15 +31,18 @@ export function hasWallet(): boolean {
   return typeof window !== "undefined" && Boolean(window.ethereum) && Boolean(ESCROW_ADDRESS);
 }
 
+export type FundStep = (step: string) => void;
+
 export async function fundPromise(input: {
   promiseId: string;
   maker: Address;
   beneficiary: Address;
   amountUsdc: string;
   deadline: string;
-  onStep?: (step: string) => void;
+  onStep?: FundStep;
 }): Promise<Hex> {
-  if (!ESCROW_ADDRESS) throw new Error("The escrow is not configured.");
+  const escrow = ESCROW_ADDRESS;
+  if (!escrow) throw new Error("The escrow is not configured.");
   const wallet = createWalletClient({ account: input.maker, chain, transport: custom(provider()) });
   const reader = createPublicClient({ chain, transport: http() });
   if ((await wallet.getChainId()) !== chain.id) await wallet.switchChain({ id: chain.id });
@@ -34,36 +51,82 @@ export async function fundPromise(input: {
   const balance = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "balanceOf", args: [input.maker] });
   if (balance < amount) throw new Error("Not enough test USDC in this wallet. Get some from the Circle faucet.");
 
-  const allowance = await reader.readContract({
-    address: USDC_ADDRESS,
-    abi: usdcAbi,
-    functionName: "allowance",
-    args: [input.maker, ESCROW_ADDRESS],
+  const id = escrowId(input.promiseId);
+  const deadline = BigInt(Math.floor(new Date(input.deadline).getTime() / 1000));
+  const allowance = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "allowance", args: [input.maker, escrow] });
+  const createArgs = [id, input.beneficiary, amount, deadline] as const;
+
+  // Already approved: one plain create.
+  if (allowance >= amount) return createOnly(wallet, reader, escrow, createArgs, input.onStep);
+
+  const capabilities = await wallet.getCapabilities({ chainId: chain.id }).catch(() => null);
+  const path = chooseFundPath({
+    capabilities: capabilities as Record<string, unknown> | null,
+    usdcHasPermit: await usdcHasPermit(reader, USDC_ADDRESS, input.maker),
+    escrowHasPermit: await escrowHasPermit(reader, escrow),
   });
-  if (allowance < amount) {
-    input.onStep?.("Approve USDC in your wallet…");
-    const approveTx = await wallet.writeContract({
-      address: USDC_ADDRESS,
-      abi: usdcAbi,
-      functionName: "approve",
-      args: [ESCROW_ADDRESS, amount],
-    });
-    await reader.waitForTransactionReceipt({ hash: approveTx });
-    for (let i = 0; i < 10; i++) {
-      const seen = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "allowance", args: [input.maker, ESCROW_ADDRESS] });
-      if (seen >= amount) break;
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  if (path === "batch") {
+    try {
+      input.onStep?.("Approve and lock in one step in your wallet…");
+      const { id: callsId } = await wallet.sendCalls({
+        forceAtomic: true,
+        calls: [
+          { to: USDC_ADDRESS, abi: usdcAbi, functionName: "approve", args: [escrow, amount] },
+          { to: escrow, abi: escrowAbi, functionName: "createPromise", args: createArgs },
+        ],
+      });
+      input.onStep?.("Waiting for the batch to land…");
+      const result = await wallet.waitForCallsStatus({ id: callsId, timeout: 120_000 });
+      const hash = result.receipts?.at(-1)?.transactionHash;
+      if (result.status !== "success" || !hash) throw new Error("The batched transaction did not go through.");
+      return hash;
+    } catch (err) {
+      if (isUserRejection(err)) throw err;
+      // Some wallets report batching but fail on it. Fall through to the slower path.
     }
   }
 
-  input.onStep?.("Lock the stake in your wallet…");
-  const deadline = BigInt(Math.floor(new Date(input.deadline).getTime() / 1000));
-  const hash = await wallet.writeContract({
-    address: ESCROW_ADDRESS,
-    abi: escrowAbi,
-    functionName: "createPromise",
-    args: [escrowId(input.promiseId), input.beneficiary, amount, deadline],
-  });
+  if (path === "permit" || path === "batch") {
+    try {
+      input.onStep?.("Sign the USDC permit in your wallet…");
+      const permitDeadline = BigInt(Math.floor(Date.now() / 1000) + 30 * 60);
+      const { v, r, s } = await signPermit({ wallet, reader, usdc: USDC_ADDRESS, owner: input.maker, spender: escrow, value: amount, deadline: permitDeadline });
+      input.onStep?.("Lock the stake in your wallet…");
+      const hash = await wallet.writeContract({
+        address: escrow,
+        abi: escrowAbi,
+        functionName: "createPromiseWithPermit",
+        args: [...createArgs, permitDeadline, v, r, s],
+      });
+      const receipt = await reader.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error("The escrow transaction reverted.");
+      return hash;
+    } catch (err) {
+      if (isUserRejection(err)) throw err;
+    }
+  }
+
+  input.onStep?.("Approve USDC in your wallet…");
+  const approveTx = await wallet.writeContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "approve", args: [escrow, amount] });
+  await reader.waitForTransactionReceipt({ hash: approveTx });
+  for (let i = 0; i < 10; i++) {
+    const seen = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "allowance", args: [input.maker, escrow] });
+    if (seen >= amount) break;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  return createOnly(wallet, reader, escrow, createArgs, input.onStep);
+}
+
+async function createOnly(
+  wallet: WalletClient<Transport, Chain, Account>,
+  reader: Reader,
+  escrow: Address,
+  args: readonly [Hex, Address, bigint, bigint],
+  onStep?: FundStep,
+): Promise<Hex> {
+  onStep?.("Lock the stake in your wallet…");
+  const hash = await wallet.writeContract({ address: escrow, abi: escrowAbi, functionName: "createPromise", args });
   const receipt = await reader.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error("The escrow transaction reverted.");
   return hash;
