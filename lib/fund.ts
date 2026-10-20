@@ -55,6 +55,11 @@ export async function fundPromise(input: {
       args: [ESCROW_ADDRESS, amount],
     });
     await reader.waitForTransactionReceipt({ hash: approveTx });
+    for (let i = 0; i < 10; i++) {
+      const seen = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "allowance", args: [input.maker, ESCROW_ADDRESS] });
+      if (seen >= amount) break;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
   }
 
   input.onStep?.("Lock the stake in your wallet…");
