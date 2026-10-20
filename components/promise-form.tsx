@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, controlClass } from "@/components/field";
 import { toLocalInput } from "@/lib/format";
+import { FAUCET_URL } from "@/lib/escrow";
+import { connectWallet, fundPromise, hasWallet } from "@/lib/fund";
 import { MAX_RAW_PHOTO_BYTES, shrinkPhoto } from "@/lib/shrink";
+import { isAddress, type Address } from "viem";
 import type { PromiseDraft, ProofType } from "@/lib/types";
 
 const SIMULATED_REFUND = "0x1111111111111111111111111111111111111111";
@@ -24,6 +27,7 @@ type FormState = {
   proofType: ProofType;
   stakeUsdc: string;
   beneficiaryName: string;
+  beneficiaryAddress: string;
   repo: string;
   minCommits: string;
   since: string;
@@ -39,6 +43,7 @@ function blankForm(): FormState {
     proofType: "github_commits",
     stakeUsdc: "5.00",
     beneficiaryName: "A friend",
+    beneficiaryAddress: "",
     repo: "",
     minCommits: "1",
     since: "",
@@ -81,6 +86,20 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exampleNote, setExampleNote] = useState(false);
+  const [walletAvailable, setWalletAvailable] = useState(false);
+  const [account, setAccount] = useState<Address | null>(null);
+  const [step, setStep] = useState<string | null>(null);
+
+  useEffect(() => setWalletAvailable(hasWallet()), []);
+
+  async function connect() {
+    setError(null);
+    try {
+      setAccount(await connectWallet());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setExampleNote(false);
@@ -100,14 +119,26 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
     setError(null);
 
     const deadline = new Date(form.deadline);
+    if (account) {
+      if (!isAddress(form.beneficiaryAddress.trim())) {
+        setError("Enter the wallet address that gets the stake if you break it.");
+        setSaving(false);
+        return;
+      }
+      if (deadline.getTime() <= Date.now()) {
+        setError("To lock USDC, the deadline has to be in the future.");
+        setSaving(false);
+        return;
+      }
+    }
     const draft: PromiseDraft = {
       description: form.description,
       deadline: deadline.toISOString(),
       proofType: form.proofType,
       stakeUsdc: form.stakeUsdc,
-      makerAddress: SIMULATED_REFUND,
+      makerAddress: account ?? SIMULATED_REFUND,
       beneficiaryName: form.beneficiaryName,
-      beneficiaryAddress: SIMULATED_PAYOUT,
+      beneficiaryAddress: account ? form.beneficiaryAddress.trim() : SIMULATED_PAYOUT,
     };
 
     if (form.proofType === "github_commits") {
@@ -142,6 +173,25 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not save the promise.");
 
+      if (account) {
+        const txHash = await fundPromise({
+          promiseId: data.id,
+          maker: account,
+          beneficiary: data.beneficiaryAddress,
+          amountUsdc: data.stakeUsdc,
+          deadline: data.deadline,
+          onStep: setStep,
+        });
+        setStep("Confirming the escrow…");
+        const staked = await fetch(`/api/promises/${data.id}/stake`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ txHash }),
+        });
+        const stakedData = await staked.json();
+        if (!staked.ok) throw new Error(stakedData.error || "The stake was sent, but the app could not confirm it.");
+      }
+
       if (form.proofType === "image" && file) {
         const body = new FormData();
         body.append("image", await shrinkPhoto(file));
@@ -157,6 +207,7 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+    setStep(null);
     setSaving(false);
   }
 
@@ -196,7 +247,21 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
             <Field label="Deadline">
               <Input type="datetime-local" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} required className="h-11 text-base md:text-base" />
             </Field>
-            <Field label="Stake (USDC)" hint="Simulated. Nothing is charged.">
+            <Field
+              label="Stake (USDC)"
+              hint={
+                account ? (
+                  <>
+                    Test USDC on Base Sepolia.{" "}
+                    <a href={FAUCET_URL} target="_blank" rel="noreferrer" className="underline">
+                      Get some from the Circle faucet
+                    </a>
+                  </>
+                ) : (
+                  "Simulated. Connect a wallet to lock real test USDC."
+                )
+              }
+            >
               <Input value={form.stakeUsdc} onChange={(event) => set("stakeUsdc", event.target.value)} inputMode="decimal" required className="h-11 text-base md:text-base" />
             </Field>
           </div>
@@ -284,6 +349,30 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
             <Input value={form.beneficiaryName} onChange={(event) => set("beneficiaryName", event.target.value)} placeholder="A friend" required className="h-11 text-base md:text-base" />
           </Field>
 
+          {account && (
+            <Field label="Their wallet address" hint="If you keep it, the stake comes back to your wallet.">
+              <Input value={form.beneficiaryAddress} onChange={(event) => set("beneficiaryAddress", event.target.value)} placeholder="0x…" required className="h-11 font-mono text-base md:text-base" />
+            </Field>
+          )}
+
+          {walletAvailable && (
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              {account ? (
+                <span className="font-mono break-all">Wallet {account}</span>
+              ) : (
+                <Button type="button" variant="outline" onClick={connect} className="h-11">
+                  Connect wallet
+                </Button>
+              )}
+            </div>
+          )}
+
+          {step && (
+            <p aria-live="polite" className="text-sm">
+              {step}
+            </p>
+          )}
+
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -291,7 +380,7 @@ export function PromiseForm({ onCreated }: { onCreated: () => Promise<void> }) {
           )}
 
           <Button type="submit" disabled={saving} className="h-11 w-full sm:w-fit">
-            {saving ? "Saving…" : "Make the promise"}
+            {saving ? "Saving…" : account ? "Make the promise and lock USDC" : "Make the promise"}
           </Button>
         </form>
       </CardContent>
