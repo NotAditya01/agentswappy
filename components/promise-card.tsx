@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
 import { txUrl } from "@/lib/escrow";
+import { expireOnchain } from "@/lib/fund";
+import { walletErrorMessage } from "@/lib/wallet-error";
+import { useWallet } from "@/components/wallet-provider";
 import { needsOnchainSettle } from "@/lib/stake";
 import { shrinkPhoto } from "@/lib/shrink";
 import type { PromiseRecord, TraceStep, Verdict } from "@/lib/types";
@@ -67,8 +70,37 @@ export function PromiseCard({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [seconds, setSeconds] = useState(0);
-  const settled = promise.verdict === "kept" || promise.verdict === "broken";
-  const label = promise.verdict ? VERDICT_LABEL[promise.verdict] : checking ? "Checking" : "Open";
+  const wallet = useWallet();
+  const [expiring, setExpiring] = useState(false);
+  const [expireError, setExpireError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const chainState = promise.chain;
+  const expired = chainState?.status === "expired";
+  const settled = promise.verdict === "kept" || promise.verdict === "broken" || expired;
+  const label = expired ? "Expired" : promise.verdict ? VERDICT_LABEL[promise.verdict] : checking ? "Checking" : "Open";
+  const stake = chainState?.stakeUsdc ?? promise.stakeUsdc;
+  const backed = chainState ? Number(chainState.backedUsdc) : (promise.backings ?? []).reduce((sum, b) => sum + Number(b.amountUsdc), 0);
+  const canExpire = chainState?.status === "open" && now > new Date(chainState.expiresAt).getTime();
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  async function expire() {
+    if (!promise.onchain) return;
+    setExpiring(true);
+    setExpireError(null);
+    try {
+      const from = wallet.account ?? (await wallet.connect());
+      if (!from) throw new Error(wallet.error || "Connect a wallet first.");
+      await expireOnchain(promise.onchain.escrowId, from);
+      await onUploaded();
+    } catch (err) {
+      setExpireError(walletErrorMessage(err));
+    }
+    setExpiring(false);
+  }
 
   useEffect(() => {
     if (!checking) return;
@@ -100,7 +132,7 @@ export function PromiseCard({
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={verdictVariant(promise.verdict)}>{label}</Badge>
           <Badge variant="outline">{PROOF_LABEL[promise.proofType]}</Badge>
-          <span className="ml-auto text-sm">{formatUsdc(promise.stakeUsdc)} USDC</span>
+          <span className="ml-auto text-sm">{formatUsdc(stake)} USDC</span>
         </div>
         <h3 className="text-base font-medium leading-snug break-words">{promise.description}</h3>
       </CardHeader>
@@ -109,13 +141,26 @@ export function PromiseCard({
           <Meta label="Proof" value={promise.target} />
           <Meta label="Deadline" value={`${formatWhen(promise.deadline)} · ${dueLabel(promise.deadline)}`} />
           <Meta label="If broken, it goes to" value={promise.beneficiaryName} />
-          <Meta label="Stake" value={`${formatUsdc(promise.stakeUsdc)} USDC, ${promise.onchain ? "locked in escrow" : "simulated"}`} />
+          <Meta label="Stake" value={`${formatUsdc(stake)} USDC, ${chainState ? `${chainState.status === "open" ? "locked in escrow" : chainState.status} (read on-chain)` : promise.onchain ? "locked in escrow" : "simulated"}`} />
+          {backed > 0 && <Meta label="Backed by others" value={`${formatUsdc(String(backed))} USDC`} />}
         </dl>
 
         {promise.onchain && <TxLink label="Stake locked" hash={promise.onchain.createTx} />}
         {promise.backings?.map((b) => (
           <TxLink key={b.creditTx} label={`Backed with ${formatUsdc(b.amountUsdc)} USDC`} hash={b.creditTx} />
         ))}
+
+        {expired && <p className="border px-3 py-2 text-sm">Expired on-chain. The stake and any backing went back to whoever put it in.</p>}
+
+        {canExpire && !promise.settlement && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-muted-foreground">Swappy missed the grace window. Anyone can expire this and refund everyone.</p>
+            <Button type="button" variant="outline" disabled={expiring} onClick={expire} className="h-11 w-full sm:w-auto">
+              {expiring ? "Expiring…" : "Expire and refund"}
+            </Button>
+            {expireError && <p role="alert" className="text-sm text-destructive">{expireError}</p>}
+          </div>
+        )}
 
         {promise.proofType === "image" && promise.imageProof && (
           <img

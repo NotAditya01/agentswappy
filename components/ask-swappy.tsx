@@ -1,5 +1,6 @@
 "use client";
 
+import { walletErrorMessage } from "@/lib/wallet-error";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { controlClass } from "@/components/field";
@@ -57,7 +58,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
       setReply(data);
       setSender(data.agentAddress ? "agent" : "wallet");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(walletErrorMessage(err));
     }
     setBusy(null);
   }
@@ -113,7 +114,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
       }
       setReply(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(walletErrorMessage(err));
     }
     setBusy(null);
   }

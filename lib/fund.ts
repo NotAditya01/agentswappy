@@ -31,6 +31,12 @@ export function hasWallet(): boolean {
   return typeof window !== "undefined" && Boolean(window.ethereum) && Boolean(ESCROW_ADDRESS);
 }
 
+async function onBaseSepolia(wallet: { getChainId: () => Promise<number>; switchChain: (a: { id: number }) => Promise<void> }) {
+  if ((await wallet.getChainId()) === chain.id) return;
+  await wallet.switchChain({ id: chain.id }).catch(() => undefined);
+  if ((await wallet.getChainId()) !== chain.id) throw new Error("Your wallet is on the wrong network. Switch it to Base Sepolia and try again.");
+}
+
 export type FundStep = (step: string) => void;
 
 export async function fundPromise(input: {
@@ -45,7 +51,7 @@ export async function fundPromise(input: {
   if (!escrow) throw new Error("The escrow is not configured.");
   const wallet = createWalletClient({ account: input.maker, chain, transport: custom(provider()) });
   const reader = createPublicClient({ chain, transport: http() });
-  if ((await wallet.getChainId()) !== chain.id) await wallet.switchChain({ id: chain.id });
+  await onBaseSepolia(wallet);
 
   const amount = usdcUnits(input.amountUsdc);
   const balance = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "balanceOf", args: [input.maker] });
@@ -135,8 +141,7 @@ async function createOnly(
 export async function sendFromWallet(transfer: Transfer, from: Address): Promise<Hex> {
   const wallet = createWalletClient({ account: from, chain, transport: custom(provider()) });
   const reader = createPublicClient({ chain, transport: http() });
-  if ((await wallet.getChainId()) !== chain.id) await wallet.switchChain({ id: chain.id });
-  if ((await wallet.getChainId()) !== chain.id) throw new Error("Switch your wallet to Base Sepolia first.");
+  await onBaseSepolia(wallet);
 
   const amount = toUnits(transfer.token, transfer.amount);
   const hash =
@@ -154,12 +159,26 @@ export async function sendBacking(amountUsdc: string, from: Address): Promise<He
   if (!escrow) throw new Error("The escrow is not configured.");
   const wallet = createWalletClient({ account: from, chain, transport: custom(provider()) });
   const reader = createPublicClient({ chain, transport: http() });
-  if ((await wallet.getChainId()) !== chain.id) await wallet.switchChain({ id: chain.id });
+  await onBaseSepolia(wallet);
   const amount = usdcUnits(amountUsdc);
   const balance = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "balanceOf", args: [from] });
   if (balance < amount) throw new Error("Not enough test USDC in this wallet. Get some from the Circle faucet.");
   const hash = await wallet.writeContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "transfer", args: [escrow, amount] });
   const receipt = await reader.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error(`The transfer reverted. Tx ${hash}`);
+  return hash;
+}
+
+// Anyone can expire a promise once the agent missed the grace window; funds go back to the maker and backers.
+export async function expireOnchain(escrowIdHex: Hex, from: Address): Promise<Hex> {
+  const escrow = ESCROW_ADDRESS;
+  if (!escrow) throw new Error("The escrow is not configured.");
+  const wallet = createWalletClient({ account: from, chain, transport: custom(provider()) });
+  const reader = createPublicClient({ chain, transport: http() });
+  await onBaseSepolia(wallet);
+  await reader.simulateContract({ account: from, address: escrow, abi: escrowAbi, functionName: "expire", args: [escrowIdHex] });
+  const hash = await wallet.writeContract({ address: escrow, abi: escrowAbi, functionName: "expire", args: [escrowIdHex] });
+  const receipt = await reader.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`The expire transaction reverted. Tx ${hash}`);
   return hash;
 }

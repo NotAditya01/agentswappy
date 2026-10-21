@@ -1,5 +1,6 @@
 "use client";
 
+import { walletErrorMessage } from "@/lib/wallet-error";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -224,7 +225,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
       setExampleNote(false);
       await onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(walletErrorMessage(err));
     }
     setStep(null);
     setSaving(false);
