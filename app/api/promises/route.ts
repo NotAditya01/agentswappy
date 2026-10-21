@@ -1,5 +1,6 @@
 import { MODEL } from "@/agent/model";
 import { escrowReady } from "@/agent/wallet";
+import { withChainState } from "@/lib/chain-state";
 import { createPromise, listPromises, storageKind } from "@/lib/store";
 import { validateCreate } from "@/lib/validate";
 
@@ -7,7 +8,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const promises = await listPromises();
+  const promises = await withChainState(await listPromises());
   return Response.json({
     promises,
     meta: {

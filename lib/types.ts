@@ -97,6 +97,13 @@ export type StakeBackResult = {
 
 export type Backing = { backer: string; amountUsdc: string; txHash: string; creditTx: string; at: string };
 
+export type ChainState = {
+  status: "none" | "open" | "kept" | "broken" | "expired";
+  stakeUsdc: string;
+  backedUsdc: string;
+  expiresAt: string;
+};
+
 export type PromiseRecord = {
   id: string;
   description: string;
@@ -117,6 +124,7 @@ export type PromiseRecord = {
   onchain?: OnchainStake | null;
   walletStake?: boolean;
   backings?: Backing[];
+  chain?: ChainState;
   imageProof: ImageProof | null;
   createdAt: string;
   checkedAt: string | null;
