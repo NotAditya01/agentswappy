@@ -28,6 +28,8 @@ const STATUS_STYLE: Record<string, string> = {
   Expired: "bg-secondary text-secondary-foreground",
   Checking: "bg-blue-soft/20 text-blue-soft",
   "Not yet": "border-border text-foreground",
+  "Check proof": "bg-amber-400/15 text-amber-300 border-amber-400/50",
+  Overdue: "bg-amber-400/25 text-amber-200 border-amber-400",
   Open: "border-primary/60 text-primary",
 };
 
@@ -69,6 +71,7 @@ function factsOf(result: unknown): { label: string; value: string }[] {
 
 export function PromiseCard({
   promise,
+  standalone,
   open,
   onToggle,
   checking,
@@ -77,6 +80,7 @@ export function PromiseCard({
   onUploaded,
 }: {
   promise: PromiseRecord;
+  standalone?: boolean;
   open: boolean;
   onToggle: () => void;
   checking: boolean;
@@ -94,7 +98,29 @@ export function PromiseCard({
   const chainState = promise.chain;
   const expired = chainState?.status === "expired";
   const settled = promise.verdict === "kept" || promise.verdict === "broken" || expired;
-  const label = expired ? "Expired" : promise.verdict ? VERDICT_LABEL[promise.verdict] : checking ? "Checking" : "Open";
+  const ended = now > new Date(promise.deadline).getTime();
+  const label = expired
+    ? "Expired"
+    : checking
+      ? "Checking"
+      : promise.verdict === "kept" || promise.verdict === "broken"
+        ? VERDICT_LABEL[promise.verdict]
+        : ended
+          ? promise.verdict === "pending" ? "Overdue" : "Check proof"
+          : promise.verdict ? VERDICT_LABEL[promise.verdict] : "Open";
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    const url = `${window.location.origin}/p/${promise.id}`;
+    try {
+      if (navigator.share && window.matchMedia("(pointer: coarse)").matches) await navigator.share({ title: promise.description, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+      }
+    } catch {}
+  }
   const stake = chainState?.stakeUsdc ?? promise.stakeUsdc;
   const backed = chainState ? Number(chainState.backedUsdc) : (promise.backings ?? []).reduce((sum, b) => sum + Number(b.amountUsdc), 0);
   const canBack = chainState?.status === "open" && now < new Date(promise.deadline).getTime() && !promise.verdict;
@@ -163,6 +189,7 @@ export function PromiseCard({
 
   return (
     <Card className="min-w-0 gap-0 py-0" aria-busy={checking}>
+      <div className="flex min-w-0 items-stretch">
       <button
         type="button"
         onClick={onToggle}
@@ -175,6 +202,12 @@ export function PromiseCard({
         <span className="shrink-0 whitespace-nowrap text-right text-sm tabular-nums">{formatUsdc(String(Number(stake) + backed))} USDC</span>
         <span aria-hidden className="text-muted-foreground">{open ? "−" : "+"}</span>
       </button>
+      {!standalone && (
+        <button type="button" onClick={share} aria-label="Copy link to this promise" className="shrink-0 border-l px-3 text-xs text-muted-foreground hover:text-foreground">
+          {copied ? "Copied" : "Share"}
+        </button>
+      )}
+      </div>
       {open && (
       <CardContent className="flex flex-col gap-4 border-t px-4 py-4">
         <p className="text-sm text-muted-foreground">{PROOF_LABEL[promise.proofType]} proof · {countdown(promise.deadline, now)}</p>
