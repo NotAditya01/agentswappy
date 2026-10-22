@@ -111,7 +111,7 @@ export function Dashboard() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 pb-20 sm:px-6">
       <nav className="flex items-center justify-between gap-3 pt-5">
         <a href="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="" width={36} height={36} className="size-9" />
+          <img src="/swappy.png" alt="" width={36} height={36} className="size-9" />
           <span className="font-display text-lg font-bold">Proof of Promise</span>
         </a>
         <div className="flex items-center gap-5">
@@ -148,7 +148,7 @@ export function Dashboard() {
         </div>
         <div className="relative mx-auto">
           <div className="absolute inset-6 rounded-full bg-primary/20 blur-3xl" aria-hidden />
-          <img src="/logo.png" alt="Swappy, the mascot" width={320} height={320} className="bob relative size-56 drop-shadow-2xl sm:size-80" />
+          <img src="/swappy.png" alt="Swappy, the mascot" width={320} height={320} className="bob relative size-56 drop-shadow-2xl sm:size-80" />
           <span className="absolute -top-2 right-0 rotate-3 rounded-2xl rounded-br-sm bg-card px-4 py-2 font-display text-sm font-semibold shadow-lg ring-2 ring-primary/40 sm:right-[-1rem]">
             Show me the proof!
           </span>
@@ -229,7 +229,7 @@ export function Dashboard() {
               onClick={() => setCreating(true)}
               className={`lift flex min-h-72 flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-primary/40 p-6 text-center hover:border-primary ${filtered.length === 0 ? "sm:col-span-2 lg:col-span-3" : ""}`}
             >
-              <img src="/logo.png" alt="" width={96} height={96} className="size-24" />
+              <img src="/swappy.png" alt="" width={96} height={96} className="size-24" />
               <span className="font-display text-xl font-semibold">
                 {filtered.length === 0 ? (promises.length === 0 ? "No promises yet. Be the first!" : `No ${filter} promises right now`) : "Your promise could be next"}
               </span>

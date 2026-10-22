@@ -64,7 +64,7 @@ export function SharedPromise({ id }: { id: string }) {
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pt-5 pb-16">
       <nav className="flex items-center justify-between gap-3">
         <a href="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="" width={36} height={36} className="size-9" />
+          <img src="/swappy.png" alt="" width={36} height={36} className="size-9" />
           <span className="font-display text-lg font-bold">Proof of Promise</span>
         </a>
         <WalletButton />
@@ -117,7 +117,7 @@ export function SharedPromise({ id }: { id: string }) {
           />
 
           <a href="/#new" className="mx-auto flex items-center gap-3 rounded-3xl border-2 border-dashed border-primary/40 px-5 py-4 hover:border-primary">
-            <img src="/logo.png" alt="" width={48} height={48} className="size-12" />
+            <img src="/swappy.png" alt="" width={48} height={48} className="size-12" />
             <span>
               <span className="block font-display text-lg font-semibold">Got a goal of your own?</span>
               <span className="text-sm font-bold text-primary">Make a promise →</span>

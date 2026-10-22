@@ -125,7 +125,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-5 rounded-[2rem] border-2 bg-card p-5 sm:p-8">
       <div className="flex items-end gap-3">
-        <img src="/logo.png" alt="Swappy" width={88} height={88} className="size-20 shrink-0 sm:size-24" />
+        <img src="/swappy.png" alt="Swappy" width={88} height={88} className="size-20 shrink-0 sm:size-24" />
         <div className="relative rounded-3xl rounded-bl-md bg-muted px-5 py-4">
           <h2 className="font-display text-2xl font-bold">Ask Swappy</h2>
           <p className="mt-1 text-sm text-muted-foreground">Tell me what you want in plain words. I&apos;ll show you the plan, and nothing happens until you confirm.</p>
