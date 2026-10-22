@@ -3,7 +3,7 @@
 // Base Sepolia test USDC only.
 import { privateKeyToAccount } from "viem/accounts";
 import type { Hex } from "viem";
-import { signPayment, type PaymentRequirements } from "../lib/x402.ts";
+import { signPayment, type PaymentRequirements } from "../lib/x402";
 
 const [base, id, amount = "0.1"] = process.argv.slice(2);
 const key = process.env.PAYER_PRIVATE_KEY as Hex | undefined;
