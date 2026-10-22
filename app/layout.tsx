@@ -1,9 +1,10 @@
 import "./globals.css";
-import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Fredoka, JetBrains_Mono, Nunito } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { WalletProvider } from "@/components/wallet-provider";
 
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
+const display = Fredoka({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-display" });
+const body = Nunito({ subsets: ["latin"], variable: "--font-body" });
 const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" });
 
 export const metadata = {
@@ -13,7 +14,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn("dark font-sans antialiased", spaceGrotesk.variable, jetBrainsMono.variable)}>
+    <html lang="en" className={cn("dark font-sans antialiased", display.variable, body.variable, jetBrainsMono.variable)}>
       <body>
         <WalletProvider>{children}</WalletProvider>
       </body>

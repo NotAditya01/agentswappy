@@ -5,8 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-space-grotesk);
-    --font-sans: var(--font-space-grotesk);
+    --font-heading: var(--font-display);
+    --font-display: var(--font-display);
+    --font-sans: var(--font-body);
     --font-mono: var(--font-jetbrains-mono);
     --color-ring: var(--ring);
     --color-input: var(--input);
@@ -28,6 +29,9 @@
     --color-background: var(--background);
     --color-blue: var(--blue);
     --color-blue-soft: var(--blue-soft);
+    --color-warm: var(--warm);
+    --color-warm-deep: var(--warm-deep);
+    --color-lime-deep: var(--lime-deep);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -39,27 +43,30 @@
 
 :root {
     /* Agentmaxxing palette */
-    --background: #0A0A0A;
-    --foreground: #F2F1EC;
-    --card: #111110;
-    --card-foreground: #F2F1EC;
-    --popover: #111110;
-    --popover-foreground: #F2F1EC;
+    --background: #0B0F1A;
+    --foreground: #F4F3EE;
+    --card: #141B2B;
+    --card-foreground: #F4F3EE;
+    --popover: #141B2B;
+    --popover-foreground: #F4F3EE;
     --primary: #C8E850;
     --primary-foreground: #0A0A0A;
-    --secondary: #2A2A28;
+    --secondary: #232C40;
     --secondary-foreground: #F2F1EC;
-    --muted: #1A1A19;
-    --muted-foreground: #A8A8A1;
-    --accent: #2A2A28;
+    --muted: #1C2436;
+    --muted-foreground: #AEB4C2;
+    --accent: #232C40;
     --accent-foreground: #F2F1EC;
     --destructive: #FF6B5A;
-    --border: rgba(242, 241, 236, 0.13);
-    --input: rgba(242, 241, 236, 0.24);
+    --border: rgba(244, 243, 238, 0.10);
+    --input: rgba(244, 243, 238, 0.18);
     --ring: #C8E850;
     --blue: #2030D8;
     --blue-soft: #8C96FF;
-    --radius: 0rem;
+    --radius: 1.1rem;
+    --warm: #FF9F43;
+    --warm-deep: #C9711F;
+    --lime-deep: #8FA82B;
 }
 
 
@@ -74,10 +81,22 @@
     @apply font-sans;
     }
 }
-/* Faint 6 column grid behind the page, like agentmaxxin.xyz */
 body {
-  background-image: linear-gradient(to right, rgba(242, 241, 236, 0.045) 1px, transparent 1px);
-  background-size: calc(100% / 6) 100%;
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, rgba(200, 232, 80, 0.13), transparent 60%),
+    radial-gradient(50rem 30rem at -10% 10%, rgba(255, 159, 67, 0.10), transparent 60%),
+    var(--background);
+  background-attachment: fixed;
+}
+.lift { transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease; }
+.lift:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.6); }
+@keyframes bob { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(2deg); } }
+.bob { animation: bob 4s ease-in-out infinite; }
+@keyframes pop { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+.pop { animation: pop 220ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .lift:hover { transform: none; }
 }
 ::selection { background: var(--primary); color: var(--primary-foreground); }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }

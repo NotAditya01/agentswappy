@@ -11,4 +11,4 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 }
 
 export const controlClass =
-  "w-full min-w-0 border border-input bg-background px-3 py-2 text-base outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full min-w-0 rounded-xl border-2 border-input bg-background px-3 py-2 text-base outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50";
