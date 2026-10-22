@@ -15,16 +15,20 @@ if (!base || !id || !key) {
 const account = privateKeyToAccount(key);
 const url = `${base.replace(/\/$/, "")}/api/promises/${id}/back?amount=${amount}`;
 
-const first = await fetch(url, { method: "POST" });
-const quote = await first.json();
-console.log("first try:", first.status, JSON.stringify(quote, null, 2));
-if (first.status !== 402) process.exit(1);
+async function main() {
+  const first = await fetch(url, { method: "POST" });
+  const quote = await first.json();
+  console.log("first try:", first.status, JSON.stringify(quote, null, 2));
+  if (first.status !== 402) return process.exit(1);
 
-const req = quote.accepts[0] as PaymentRequirements;
-const header = await signPayment(account, account.address, req);
-const paid = await fetch(url, { method: "POST", headers: { "X-PAYMENT": header } });
-const data = await paid.json();
-const receipt = paid.headers.get("x-payment-response");
-console.log("paid:", paid.status);
-if (receipt) console.log("payment response:", JSON.parse(atob(receipt)));
-console.log("backings:", JSON.stringify(data.backings ?? data, null, 2));
+  const req = quote.accepts[0] as PaymentRequirements;
+  const header = await signPayment(account, account.address, req);
+  const paid = await fetch(url, { method: "POST", headers: { "X-PAYMENT": header } });
+  const data = await paid.json();
+  const receipt = paid.headers.get("x-payment-response");
+  console.log("paid:", paid.status);
+  if (receipt) console.log("payment response:", JSON.parse(atob(receipt)));
+  console.log("backings:", JSON.stringify(data.backings ?? data, null, 2));
+}
+
+main();
