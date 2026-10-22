@@ -154,7 +154,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
           <kbd className="hidden rounded border px-1.5 font-mono text-xs text-muted-foreground sm:inline">/</kbd>
         )}
       </form>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <div className="hidden flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground sm:flex">
         <span>Try</span>
         {EXAMPLES.map((example) => (
           <button key={example} type="button" className="font-mono transition-colors duration-150 hover:text-foreground" onClick={() => setPrompt(example)}>

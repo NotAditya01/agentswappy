@@ -90,16 +90,13 @@ export function Dashboard() {
         </p>
         <div className="flex gap-3 pt-4">
           <Button onClick={() => setCreating(true)} className="h-9 px-4">New promise</Button>
-          <Button variant="outline" onClick={() => document.getElementById("ask-input")?.focus()} className="h-9 px-4">
-            Ask Swappy <kbd className="ml-2 font-mono text-xs text-muted-foreground">/</kbd>
-          </Button>
         </div>
       </section>
 
       <dl className="grid grid-cols-3 divide-x rounded-md border">
         {[
-          ["Locked in open promises", stats ? `${formatUsdc(String(stats.lockedUsdc))}` : "—", "USDC"],
-          ["Promises kept", stats ? String(stats.kept) : "—", ""],
+          ["USDC locked", stats ? `${formatUsdc(String(stats.lockedUsdc))}` : "—", ""],
+          ["Kept", stats ? String(stats.kept) : "—", ""],
           ["Backers", stats ? String(stats.backers) : "—", ""],
         ].map(([name, value, unit]) => (
           <div key={name} className="flex flex-col gap-1 px-4 py-4 sm:px-6 sm:py-5">
@@ -172,7 +169,7 @@ export function Dashboard() {
             onClick={(e) => e.stopPropagation()}
             className="relative max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-t-lg border bg-popover p-6 sm:rounded-lg"
           >
-            <button type="button" onClick={() => setCreating(false)} aria-label="Close" className="absolute top-5 right-5 font-mono text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground">
+            <button type="button" onClick={() => setCreating(false)} aria-label="Close" className="absolute top-[26px] right-6 font-mono text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground">
               Esc
             </button>
             <PromiseForm onCreated={onCreated} prefill={prefill} />

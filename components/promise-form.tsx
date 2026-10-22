@@ -18,8 +18,8 @@ const SIMULATED_REFUND = "0x1111111111111111111111111111111111111111";
 const SIMULATED_PAYOUT = "0x2222222222222222222222222222222222222222";
 
 const PROOF_HELP: Record<ProofType, string> = {
-  github_commits: "We look up public commits on the repository you name, from the start date through the deadline.",
-  image: "Upload a photo or a workout screenshot from any fitness app. Gemini reads it, including distance and date, and Swappy decides if it shows what you described.",
+  github_commits: "Counts public commits on the repo between the start and the deadline.",
+  image: "Upload a photo or fitness app screenshot. Swappy checks it shows what you describe.",
 };
 
 type FormState = {
@@ -244,7 +244,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4 pr-8">
+      <div className="flex items-center justify-between gap-4 pr-12">
         <h2 className="text-base font-medium">New promise</h2>
         <button type="button" onClick={tryExample} className="text-sm text-muted-foreground underline-offset-4 transition-colors duration-150 hover:text-foreground hover:underline">
           Fill with an example
@@ -290,7 +290,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
                 )
               }
             >
-              <Input value={form.stakeUsdc} onChange={(event) => set("stakeUsdc", event.target.value)} onBlur={blur("stakeUsdc")} aria-invalid={Boolean(show("stakeUsdc"))} inputMode="decimal" required className="h-9 text-sm md:text-sm" />
+              <Input value={form.stakeUsdc} onChange={(event) => set("stakeUsdc", event.target.value)} onBlur={blur("stakeUsdc")} aria-invalid={Boolean(show("stakeUsdc"))} inputMode="decimal" required className="h-9 font-mono text-sm md:text-sm" />
             </Field>
           </div>
 
@@ -317,13 +317,13 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
 
           {form.proofType === "github_commits" && (
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Repository" hint="A public GitHub repo, like vercel/next.js." error={show("repo")}>
+              <Field label="Repository"  error={show("repo")}>
                 <Input value={form.repo} onChange={(event) => set("repo", event.target.value)} onBlur={blur("repo")} aria-invalid={Boolean(show("repo"))} placeholder="vercel/next.js" required className="h-9 text-sm md:text-sm" />
               </Field>
               <Field label="Commits needed" error={show("minCommits")}>
                 <Input value={form.minCommits} onChange={(event) => set("minCommits", event.target.value)} onBlur={blur("minCommits")} aria-invalid={Boolean(show("minCommits"))} inputMode="numeric" required className="h-9 text-sm md:text-sm" />
               </Field>
-              <Field label="Start counting" hint="Leave blank to start when you make the promise. The deadline is the end.">
+              <Field label="Start counting" hint="Optional. Defaults to now.">
                 <Input type="datetime-local" value={form.since} onChange={(event) => set("since", event.target.value)} className="h-9 text-sm md:text-sm" />
               </Field>
             </div>

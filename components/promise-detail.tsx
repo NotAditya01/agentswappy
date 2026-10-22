@@ -171,7 +171,7 @@ export function PromiseDetail({
         </div>
 
         <dl className="grid grid-cols-[140px_minmax(0,1fr)] gap-x-6 gap-y-3 border-t pt-6 text-sm">
-          <KV k="Amount"><span className="font-mono">{formatUsdc(String(total))} USDC</span>{backed > 0 && <span className="text-muted-foreground"> · {formatUsdc(String(stake))} stake + {formatUsdc(String(backed))} backed</span>}</KV>
+          <KV k="Amount"><span className="font-mono">{formatUsdc(String(total))} USDC</span>{backed > 0 && <span className="text-muted-foreground"> · <span className="font-mono">{formatUsdc(String(stake))}</span> stake + <span className="font-mono">{formatUsdc(String(backed))}</span> backed</span>}</KV>
           <KV k="Deadline"><span className="font-mono">{formatWhen(promise.deadline)}</span><span className="text-muted-foreground"> · <span className="font-mono">{countdown(promise.deadline, now)}</span></span></KV>
           <KV k="Proof">{PROOF_LABEL[promise.proofType]} · {promise.target}</KV>
           <KV k="If broken">{promise.beneficiaryName}{promise.onchain && <span className="text-muted-foreground"> · <span className="font-mono">{shortAddress(promise.beneficiaryAddress)}</span></span>}</KV>
