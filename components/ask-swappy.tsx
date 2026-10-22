@@ -127,7 +127,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
     <section className="flex flex-col gap-3 border px-4 py-5">
       <div>
         <h2 className="text-xl font-semibold tracking-tight">Ask Swappy</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Make a promise, back one, or send test USDC or ETH. You review it before anything happens.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Prefer typing? Tell Swappy what you want in plain words. Nothing happens until you confirm.</p>
       </div>
       <form onSubmit={ask} className="flex flex-col gap-2 sm:flex-row">
         <input

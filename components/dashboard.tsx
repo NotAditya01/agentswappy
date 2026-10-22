@@ -38,6 +38,14 @@ export function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  function retry() {
+    setError(null);
+    setLoading(true);
+    refresh()
+      .catch(() => setError("Could not load promises. Check your connection."))
+      .finally(() => setLoading(false));
+  }
+
   const [prefill, setPrefill] = useState<{ value: PromisePrefill; key: number } | null>(null);
 
   function fillForm(value: PromisePrefill) {
@@ -67,32 +75,52 @@ export function Dashboard() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-8 sm:py-12">
-      <header className="flex flex-col gap-3">
-        <p className="text-sm text-muted-foreground">
-          {meta?.settlement === "escrow"
-            ? "Base Sepolia testnet. Connect a wallet to lock test USDC, or leave it off to simulate."
-            : "Settlement is simulated. No real money moves."}
-        </p>
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Swappy" width={44} height={44} className="size-11" />
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Proof of Promise</h1>
+    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 sm:py-10">
+      <nav className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" alt="" width={32} height={32} className="size-8" />
+          <span className="font-semibold">Swappy</span>
         </div>
         <WalletButton />
-        <p className="text-base text-muted-foreground">
-          Make a promise, find it in the list, then check the proof. Swappy, the agent, calls a tool, reads the result, and decides if you kept it.
+      </nav>
+
+      <header className="flex flex-col gap-4">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Proof of Promise</h1>
+        <p className="text-lg">
+          Put a little USDC behind a promise. Swappy checks your proof and sends the money back to you, or to a friend if you miss it.
         </p>
+        <ol className="grid gap-3 sm:grid-cols-3">
+          {[
+            ["1. Promise", "Say what you will do, by when, and how much you put on it."],
+            ["2. Prove", "Swappy checks your GitHub commits or a photo you upload."],
+            ["3. Settle", "Kept: you get it back. Broken: it goes to your friend."],
+          ].map(([title, text]) => (
+            <li key={title} className="border bg-card px-4 py-3">
+              <p className="font-medium text-primary">{title}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+            </li>
+          ))}
+        </ol>
+        <p className="text-sm text-muted-foreground">
+          {meta?.settlement === "escrow"
+            ? "Runs on Base Sepolia testnet with test USDC. No wallet? You can still try it, the money part is just simulated."
+            : "Money is simulated here. Nothing real moves."}
+        </p>
+        <a href="#promise-form" className="inline-flex h-11 w-full items-center justify-center bg-primary px-5 font-medium text-primary-foreground sm:w-fit">
+          Make your first promise
+        </a>
       </header>
 
       {!loading && meta && !meta.hasApiKey && (
         <p role="status" className="border px-4 py-3 text-sm">
-          GEMINI_API_KEY is not set, so Check proof cannot run. Add the key and try again. Nothing is settled from a guess.
+          Proof checks are switched off right now because Swappy has no AI key. Nothing gets settled on a guess.
         </p>
       )}
       {error && (
-        <p role="alert" className="border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
-        </p>
+        <div role="alert" className="flex flex-wrap items-center gap-3 border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <span>{error}</span>
+          <button type="button" onClick={retry} className="underline underline-offset-4">Try again</button>
+        </div>
       )}
 
       <AskSwappy onPrefill={fillForm} onChanged={refresh} />
@@ -102,17 +130,21 @@ export function Dashboard() {
       </div>
 
       <section id="promises" className="flex flex-col gap-4 scroll-mt-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Step 2</p>
-          <h2 className="text-xl font-semibold tracking-tight">Your promises</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">Promises</h2>
+          {!loading && promises.length > 0 && <span className="text-sm text-muted-foreground">{promises.length} total</span>}
         </div>
-        {loading && <p className="text-sm text-muted-foreground">Loading your promises…</p>}
-        {!loading && promises.length === 0 && (
+        {loading && (
+          <div aria-busy="true" aria-label="Loading promises" className="flex flex-col gap-4">
+            {[0, 1].map((i) => (
+              <div key={i} className="h-40 animate-pulse border bg-card" />
+            ))}
+          </div>
+        )}
+        {!loading && !error && promises.length === 0 && (
           <div className="border px-4 py-6">
             <p className="font-medium">No promises yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Make one above. Try an example only fills the form — it does not create a result.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Make one above and it shows up here, ready to check.</p>
           </div>
         )}
         {promises.map((promise) => (

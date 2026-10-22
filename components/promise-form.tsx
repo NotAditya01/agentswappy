@@ -78,6 +78,28 @@ function parseRepo(input: string): { owner: string; repo: string } | null {
   return { owner: parts[0], repo: parts[1] };
 }
 
+type Problems = Partial<Record<keyof FormState, string>>;
+
+function problemsOf(form: FormState, walletStake: boolean): Problems {
+  const out: Problems = {};
+  if (form.description.trim().length < 5) out.description = "Write a few words about what you will do.";
+  const stake = Number(form.stakeUsdc);
+  if (!Number.isFinite(stake) || stake <= 0) out.stakeUsdc = "Enter an amount above 0, like 1.00.";
+  const deadline = new Date(form.deadline).getTime();
+  if (Number.isNaN(deadline)) out.deadline = "Pick a date and time.";
+  else if (walletStake && deadline <= Date.now()) out.deadline = "To lock USDC, pick a time in the future.";
+  if (form.proofType === "github_commits") {
+    if (!parseRepo(form.repo)) out.repo = "Use owner/repo, like vercel/next.js.";
+    const n = Number(form.minCommits);
+    if (!Number.isInteger(n) || n < 1) out.minCommits = "Use a whole number, 1 or more.";
+  } else if (form.claim.trim().length < 3) {
+    out.claim = "Describe what the photo should show.";
+  }
+  if (!form.beneficiaryName.trim()) out.beneficiaryName = "Give them a name, like Sam.";
+  if (walletStake && !isAddress(form.beneficiaryAddress.trim())) out.beneficiaryAddress = "Paste their wallet address, it starts with 0x.";
+  return out;
+}
+
 export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<void>; prefill?: { value: PromisePrefill; key: number } | null }) {
   const [form, setForm] = useState(blankForm);
   const [file, setFile] = useState<File | null>(null);
@@ -87,6 +109,11 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
   const [walletAvailable, setWalletAvailable] = useState(false);
   const { account, connect: connectShared, refreshBalance, error: walletError } = useWallet();
   const [step, setStep] = useState<string | null>(null);
+  const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const problems = problemsOf(form, Boolean(account));
+  const show = (key: keyof FormState) => (submitted || touched[key] ? problems[key] : undefined);
+  const blur = (key: keyof FormState) => () => setTouched((t) => ({ ...t, [key]: true }));
 
   useEffect(() => setWalletAvailable(hasWallet()), []);
 
@@ -128,22 +155,15 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setSaving(true);
+    setSubmitted(true);
     setError(null);
+    if (Object.keys(problems).length > 0) {
+      setError("Fix the highlighted fields first.");
+      return;
+    }
+    setSaving(true);
 
     const deadline = new Date(form.deadline);
-    if (account) {
-      if (!isAddress(form.beneficiaryAddress.trim())) {
-        setError("Enter the wallet address that gets the stake if you break it.");
-        setSaving(false);
-        return;
-      }
-      if (deadline.getTime() <= Date.now()) {
-        setError("To lock USDC, the deadline has to be in the future.");
-        setSaving(false);
-        return;
-      }
-    }
     const draft: PromiseDraft = {
       description: form.description,
       deadline: deadline.toISOString(),
@@ -213,6 +233,8 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
       setForm(blankForm());
       setFile(null);
       setExampleNote(false);
+      setTouched({});
+      setSubmitted(false);
       await onCreated();
     } catch (err) {
       setError(walletErrorMessage(err));
@@ -226,8 +248,8 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
       <CardHeader className="gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">Step 1</p>
             <h2 className="text-xl font-semibold tracking-tight">Make a promise</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Takes about a minute. Not sure? Try the example.</p>
           </div>
           <Button type="button" variant="outline" onClick={tryExample} className="h-11">
             Try an example
@@ -235,17 +257,19 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
         </div>
       </CardHeader>
       <CardContent>
-        <form className="flex flex-col gap-4" onSubmit={submit}>
+        <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
           {exampleNote && (
             <p className="text-sm text-muted-foreground">
               The example only fills this form. It uses public commits on vercel/next.js. Nothing is saved until you make the promise.
             </p>
           )}
 
-          <Field label="What will you do?">
+          <Field label="What will you do?" error={show("description")}>
             <textarea
               value={form.description}
               onChange={(event) => set("description", event.target.value)}
+              onBlur={blur("description")}
+              aria-invalid={Boolean(show("description"))}
               required
               rows={3}
               placeholder="Ship one commit to my repo"
@@ -254,11 +278,12 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Deadline">
-              <Input type="datetime-local" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} required className="h-11 text-base md:text-base" />
+            <Field label="Deadline" error={show("deadline")}>
+              <Input type="datetime-local" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} onBlur={blur("deadline")} aria-invalid={Boolean(show("deadline"))} required className="h-11 text-base md:text-base" />
             </Field>
             <Field
-              label="Stake (USDC)"
+              label="How much to put on it (USDC)"
+              error={show("stakeUsdc")}
               hint={
                 account ? (
                   <>
@@ -268,11 +293,11 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
                     </a>
                   </>
                 ) : (
-                  "Simulated. Connect a wallet to lock real test USDC."
+                  "Simulated for now. Connect a wallet to use real test USDC."
                 )
               }
             >
-              <Input value={form.stakeUsdc} onChange={(event) => set("stakeUsdc", event.target.value)} inputMode="decimal" required className="h-11 text-base md:text-base" />
+              <Input value={form.stakeUsdc} onChange={(event) => set("stakeUsdc", event.target.value)} onBlur={blur("stakeUsdc")} aria-invalid={Boolean(show("stakeUsdc"))} inputMode="decimal" required className="h-11 text-base md:text-base" />
             </Field>
           </div>
 
@@ -299,11 +324,11 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
 
           {form.proofType === "github_commits" && (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Repository" hint="A public GitHub repo, like vercel/next.js.">
-                <Input value={form.repo} onChange={(event) => set("repo", event.target.value)} placeholder="vercel/next.js" required className="h-11 text-base md:text-base" />
+              <Field label="Repository" hint="A public GitHub repo, like vercel/next.js." error={show("repo")}>
+                <Input value={form.repo} onChange={(event) => set("repo", event.target.value)} onBlur={blur("repo")} aria-invalid={Boolean(show("repo"))} placeholder="vercel/next.js" required className="h-11 text-base md:text-base" />
               </Field>
-              <Field label="Commits needed">
-                <Input value={form.minCommits} onChange={(event) => set("minCommits", event.target.value)} inputMode="numeric" required className="h-11 text-base md:text-base" />
+              <Field label="Commits needed" error={show("minCommits")}>
+                <Input value={form.minCommits} onChange={(event) => set("minCommits", event.target.value)} onBlur={blur("minCommits")} aria-invalid={Boolean(show("minCommits"))} inputMode="numeric" required className="h-11 text-base md:text-base" />
               </Field>
               <Field label="Start counting" hint="Leave blank to start when you make the promise. The deadline is the end.">
                 <Input type="datetime-local" value={form.since} onChange={(event) => set("since", event.target.value)} className="h-11 text-base md:text-base" />
@@ -313,10 +338,12 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
 
           {form.proofType === "image" && (
             <div className="flex flex-col gap-4">
-              <Field label="What should the photo show?">
+              <Field label="What should the photo show?" hint="Be specific, like a 5k run on a fitness app screenshot." error={show("claim")}>
                 <textarea
                   value={form.claim}
                   onChange={(event) => set("claim", event.target.value)}
+                  onBlur={blur("claim")}
+                  aria-invalid={Boolean(show("claim"))}
                   required
                   rows={3}
                   placeholder="A race bib from a 5k"
@@ -343,23 +370,23 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
             </div>
           )}
 
-          <Field label="Who gets the stake if you break it?">
-            <Input value={form.beneficiaryName} onChange={(event) => set("beneficiaryName", event.target.value)} placeholder="A friend" required className="h-11 text-base md:text-base" />
+          <Field label="Who gets the money if you miss it?" hint="A friend, a rival, a cause. Picking someone you'd hate to pay works best." error={show("beneficiaryName")}>
+            <Input value={form.beneficiaryName} onChange={(event) => set("beneficiaryName", event.target.value)} onBlur={blur("beneficiaryName")} aria-invalid={Boolean(show("beneficiaryName"))} placeholder="A friend" required className="h-11 text-base md:text-base" />
           </Field>
 
           {account && (
-            <Field label="Their wallet address" hint="If you keep it, the stake comes back to your wallet.">
-              <Input value={form.beneficiaryAddress} onChange={(event) => set("beneficiaryAddress", event.target.value)} placeholder="0x…" required className="h-11 font-mono text-base md:text-base" />
+            <Field label="Their wallet address" hint="If you keep the promise, the money comes back to your wallet." error={show("beneficiaryAddress")}>
+              <Input value={form.beneficiaryAddress} onChange={(event) => set("beneficiaryAddress", event.target.value)} onBlur={blur("beneficiaryAddress")} aria-invalid={Boolean(show("beneficiaryAddress"))} placeholder="0x…" required className="h-11 font-mono text-base md:text-base" />
             </Field>
           )}
 
           {walletAvailable && (
             <div className="flex flex-wrap items-center gap-3 text-sm">
               {account ? (
-                <span className="font-mono break-all">Wallet {account}</span>
+                <span className="text-muted-foreground">Paying from <span className="font-mono text-foreground">{account.slice(0, 6)}…{account.slice(-4)}</span></span>
               ) : (
                 <Button type="button" variant="outline" onClick={connect} className="h-11">
-                  Connect wallet
+                  Connect wallet to use test USDC
                 </Button>
               )}
               {!account && walletError && (
@@ -381,7 +408,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
           )}
 
           <Button type="submit" disabled={saving} className="h-11 w-full sm:w-fit">
-            {saving ? "Saving…" : account ? "Make the promise and lock USDC" : "Make the promise"}
+            {saving ? step ?? "Saving…" : account ? `Make the promise and lock ${form.stakeUsdc || "0"} USDC` : "Make the promise"}
           </Button>
         </form>
       </CardContent>

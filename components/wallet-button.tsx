@@ -10,7 +10,7 @@ export function WalletButton() {
   if (installed === null) return <div className="h-8" />;
 
   if (!installed) {
-    return <p className="text-sm text-muted-foreground">No browser wallet found. Install Coinbase Wallet or MetaMask to connect.</p>;
+    return <p className="text-sm text-muted-foreground">No wallet found. You can still try it.</p>;
   }
 
   if (!account) {

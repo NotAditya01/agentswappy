@@ -12,7 +12,7 @@ import { walletErrorMessage } from "@/lib/wallet-error";
 import { useWallet } from "@/components/wallet-provider";
 import { needsOnchainSettle } from "@/lib/stake";
 import { shrinkPhoto } from "@/lib/shrink";
-import type { PromiseRecord, TraceStep, Verdict } from "@/lib/types";
+import type { PromiseRecord, TraceStep } from "@/lib/types";
 
 
 const TOOL_LABEL: Record<string, string> = {
@@ -22,11 +22,25 @@ const TOOL_LABEL: Record<string, string> = {
   settle_stake: "Settled the stake",
 };
 
-function verdictVariant(verdict: Verdict | null): "default" | "destructive" | "outline" | "secondary" {
-  if (verdict === "kept") return "default";
-  if (verdict === "broken") return "destructive";
-  if (verdict === "pending") return "outline";
-  return "secondary";
+const STATUS_STYLE: Record<string, string> = {
+  Kept: "bg-primary text-primary-foreground",
+  Broken: "bg-destructive/20 text-destructive",
+  Expired: "bg-secondary text-secondary-foreground",
+  Checking: "bg-blue-soft/20 text-blue-soft",
+  "Not yet": "border-border text-foreground",
+  Open: "border-primary/60 text-primary",
+};
+
+function countdown(iso: string, now: number): string {
+  const diff = new Date(iso).getTime() - now;
+  if (Number.isNaN(diff)) return "";
+  const past = diff < 0;
+  const mins = Math.floor(Math.abs(diff) / 60_000);
+  const d = Math.floor(mins / 1440);
+  const h = Math.floor((mins % 1440) / 60);
+  const m = mins % 60;
+  const parts = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${Math.max(m, 1)}m`;
+  return past ? `ended ${parts} ago` : `${parts} left`;
 }
 
 function summaryOf(result: unknown): string | null {
@@ -147,30 +161,30 @@ export function PromiseCard({
     <Card className="min-w-0" aria-busy={checking}>
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={verdictVariant(promise.verdict)}>{label}</Badge>
-          <Badge variant="outline">{PROOF_LABEL[promise.proofType]}</Badge>
-          <span className="ml-auto text-sm">{formatUsdc(stake)} USDC</span>
+          <Badge variant="outline" className={STATUS_STYLE[label]}>{label}</Badge>
+          <Badge variant="outline">{PROOF_LABEL[promise.proofType]} proof</Badge>
+          <span className="ml-auto text-sm text-muted-foreground">{countdown(promise.deadline, now)}</span>
         </div>
         <h3 className="text-base font-medium leading-snug break-words">{promise.description}</h3>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <Meta label="Proof" value={promise.target} />
+          <Meta label="On the line" value={`${formatUsdc(stake)} USDC${backed > 0 ? ` + ${formatUsdc(String(backed))} from backers` : ""}${chainState || promise.onchain ? "" : " (simulated)"}`} />
           <Meta label="Deadline" value={`${formatWhen(promise.deadline)} · ${dueLabel(promise.deadline)}`} />
+          <Meta label="Proof" value={promise.target} />
           <Meta label="If broken, it goes to" value={promise.beneficiaryName} />
-          <Meta label="Stake" value={`${formatUsdc(stake)} USDC, ${chainState ? `${chainState.status === "open" ? "locked in escrow" : chainState.status} (read on-chain)` : promise.onchain ? "locked in escrow" : "simulated"}`} />
-          {backed > 0 && <Meta label="Backed by others" value={`${formatUsdc(String(backed))} USDC`} />}
         </dl>
 
-        {promise.onchain && <TxLink label="Stake locked" hash={promise.onchain.createTx} />}
+        {promise.onchain && <TxLink label="Stake" hash={promise.onchain.createTx} />}
         {promise.backings?.map((b) => (
           <TxLink key={b.creditTx} label={`Backed with ${formatUsdc(b.amountUsdc)} USDC`} hash={b.creditTx} />
         ))}
 
         {canBack && (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">Back this promise with x402. You sign once, no gas. Kept: you get it back. Broken: it goes to {promise.beneficiaryName}.</p>
-            <div className="flex gap-2">
+            <p className="text-sm font-medium">Back this promise</p>
+            <p className="text-sm text-muted-foreground">Add test USDC to cheer them on. You sign once and pay no gas. If they keep it you get it back, if not it goes to {promise.beneficiaryName}.</p>
+            <div className="flex flex-wrap gap-2">
               <Input
                 aria-label="Backing in USDC"
                 inputMode="decimal"
@@ -182,16 +196,16 @@ export function PromiseCard({
                 {backStep ? "Backing…" : "Back with USDC"}
               </Button>
             </div>
-            {backStep && <p className="text-sm text-muted-foreground">{backStep}</p>}
-            {backError && <p className="text-sm text-destructive">{backError}</p>}
+            {backStep && <p aria-live="polite" className="text-sm text-muted-foreground">{backStep}</p>}
+            {backError && <p role="alert" className="text-sm text-destructive">{backError}</p>}
           </div>
         )}
 
-        {expired && <p className="border px-3 py-2 text-sm">Expired on-chain. The stake and any backing went back to whoever put it in.</p>}
+        {expired && <p className="border px-3 py-2 text-sm">Expired. Nobody checked it in time, so everyone got their USDC back.</p>}
 
         {canExpire && !promise.settlement && (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">Swappy missed the grace window. Anyone can expire this and refund everyone.</p>
+            <p className="text-sm text-muted-foreground">Nobody settled this in time. Anyone can close it and send everyone's USDC back.</p>
             <Button type="button" variant="outline" disabled={expiring} onClick={expire} className="h-11 w-full sm:w-auto">
               {expiring ? "Expiring…" : "Expire and refund"}
             </Button>
@@ -209,7 +223,7 @@ export function PromiseCard({
 
         {promise.proofType === "image" && !settled && (
           <label className="flex flex-col gap-1.5 text-sm">
-            <span>{promise.imageProof ? "Replace photo" : "Add a photo"}</span>
+            <span className="font-medium">{promise.imageProof ? "Replace photo" : "Add your photo"}</span>
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
@@ -222,19 +236,15 @@ export function PromiseCard({
           </label>
         )}
 
-        <div className="flex flex-col gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">Step 3</p>
-            <p className="font-medium">Check proof</p>
-          </div>
+        {(!settled || needsOnchainSettle(promise)) && (
           <Button type="button" disabled={(settled && !needsOnchainSettle(promise)) || checking} onClick={() => onCheck(promise.id)} className="h-11 w-full sm:w-auto">
-            {checking ? "Checking…" : needsOnchainSettle(promise) ? "Settle in escrow" : settled ? "Checked" : promise.verdict === "pending" ? "Check again" : "Check proof"}
+            {checking ? "Checking…" : needsOnchainSettle(promise) ? "Finish payout" : promise.verdict === "pending" ? "Check again" : "Check my proof"}
           </Button>
-        </div>
+        )}
 
         {checking && (
           <p aria-live="polite" className="border px-3 py-2 text-sm">
-            Swappy is checking this now{seconds > 0 ? ` (${seconds}s)` : ""}. It calls a tool, reads the result, and writes a verdict.
+            Swappy is checking this now{seconds > 0 ? ` (${seconds}s)` : ""}. This usually takes under a minute.
           </p>
         )}
 
@@ -253,7 +263,7 @@ export function PromiseCard({
 
         {promise.settlement && !promise.settlement.mocked && (
           <div className="flex flex-col gap-1 border px-3 py-3 text-sm">
-            <p className="font-medium">Settled on Base Sepolia</p>
+            <p className="font-medium">Paid out on Base Sepolia</p>
             <p>
               {promise.settlement.outcome === "refund"
                 ? `${formatUsdc(promise.settlement.amount)} USDC went back to you.`
@@ -265,7 +275,7 @@ export function PromiseCard({
 
         {promise.settlement?.mocked && (
           <div className="flex flex-col gap-1 border px-3 py-3 text-sm">
-            <p className="font-medium">Simulated settlement</p>
+            <p className="font-medium">Simulated payout</p>
             <p>
               {promise.settlement.outcome === "refund"
                 ? `${formatUsdc(promise.settlement.amount)} USDC would come back to you.`
@@ -286,9 +296,9 @@ function AgentRun({ steps }: { steps: TraceStep[] }) {
   if (shown.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-3 border px-3 py-3">
-      <p className="text-sm font-medium">What Swappy did</p>
-      <ol className="flex flex-col gap-4">
+    <details className="border px-3 py-3">
+      <summary className="cursor-pointer text-sm font-medium">What Swappy did ({shown.length} steps)</summary>
+      <ol className="mt-3 flex flex-col gap-4">
         {shown.map((step, index) => {
           const summary = summaryOf(step.result);
           const facts = factsOf(step.result);
@@ -299,7 +309,6 @@ function AgentRun({ steps }: { steps: TraceStep[] }) {
                 {TOOL_LABEL[step.tool] ?? step.tool}
                 {step.error && <span className="ml-2 text-destructive">failed</span>}
               </p>
-              <p className="font-mono text-xs text-muted-foreground break-all">{step.tool}</p>
               {summary && <p>{summary}</p>}
               {txHashOf(step.result) && <TxLink label="Transaction" hash={txHashOf(step.result)!} />}
               {facts.length > 0 && (
@@ -312,8 +321,8 @@ function AgentRun({ steps }: { steps: TraceStep[] }) {
                   ))}
                 </dl>
               )}
-              <details open className="min-w-0">
-                <summary className="cursor-pointer text-muted-foreground">Tool call and response</summary>
+              <details className="min-w-0">
+                <summary className="cursor-pointer text-muted-foreground">Raw data</summary>
                 <div className="mt-2 flex flex-col gap-2">
                   <TraceJson label="Called with" value={step.args} />
                   <TraceJson label="Response" value={step.result} />
@@ -323,7 +332,7 @@ function AgentRun({ steps }: { steps: TraceStep[] }) {
           );
         })}
       </ol>
-    </div>
+    </details>
   );
 }
 

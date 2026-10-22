@@ -8,7 +8,7 @@ const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jet
 
 export const metadata = {
   title: "Proof of Promise",
-  description: "Put money on your promises. Swappy, the agent, checks the proof. Settlement is simulated.",
+  description: "Put money on your promises. Swappy, the agent, checks the proof. Runs on Base Sepolia testnet.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
