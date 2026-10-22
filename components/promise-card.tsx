@@ -171,8 +171,8 @@ export function PromiseCard({
       >
         <span className="min-w-0 flex-1 truncate font-medium">{promise.description}</span>
         <Badge variant="outline" className={STATUS_STYLE[label]}>{label}</Badge>
-        <span className="hidden w-28 text-right text-sm text-muted-foreground sm:inline">{countdown(promise.deadline, now)}</span>
-        <span className="w-20 text-right text-sm tabular-nums">{formatUsdc(String(Number(stake) + backed))} USDC</span>
+        <span className="hidden w-32 shrink-0 whitespace-nowrap text-right text-sm text-muted-foreground sm:inline">{countdown(promise.deadline, now)}</span>
+        <span className="shrink-0 whitespace-nowrap text-right text-sm tabular-nums">{formatUsdc(String(Number(stake) + backed))} USDC</span>
         <span aria-hidden className="text-muted-foreground">{open ? "−" : "+"}</span>
       </button>
       {open && (
