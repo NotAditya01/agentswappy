@@ -6,7 +6,7 @@
 
 Stake USDC on a personal promise. Swappy checks your proof (GitHub, photo, Strava) and decides whether you get the stake back or it goes to a friend or charity.
 
-**Live:** https://proof-of-promise.vercel.app · **Week 1 demo:** [YouTube](https://youtu.be/mULHLHCVfV4) · **Week 2 demo:** TODO (adii: add the Week 2 video link)
+**Live:** https://proof-of-promise.vercel.app · **Week 2 demo:** [YouTube](https://youtu.be/mULHLHCVfV4)
 
 ## The problem
 
@@ -153,8 +153,7 @@ Past deadlines are allowed, so a GitHub window that already ended can be checked
 
 ## Demo links
 
-Week 1 (proofofpromise.v1): https://youtu.be/mULHLHCVfV4  
-Week 2 (proofofpromise.v2): TODO (adii: Week 2 demo video with voiceover)  
+Week 2 (proofofpromise.v2): https://youtu.be/mULHLHCVfV4  
 Week 3 (proofofpromise.v3): TODO
 
 Live: https://proof-of-promise.vercel.app
