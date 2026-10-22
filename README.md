@@ -6,13 +6,13 @@
 
 Stake USDC on a personal promise. Swappy checks your proof (GitHub, photo, Strava) and decides whether you get the stake back or it goes to a friend or charity.
 
-**Live:** https://proof-of-promise.vercel.app · **Demo video:** [YouTube](https://youtu.be/mULHLHCVfV4)
+**Live:** https://proof-of-promise.vercel.app · **Week 1 demo:** [YouTube](https://youtu.be/mULHLHCVfV4) · **Week 2 demo:** TODO (adii: add the Week 2 video link)
 
 ## The problem
 
 Everyone says "I'll ship it this week" or "I'll start running." Nothing happens when we don't. Telling friends doesn't stick, and asking a friend to judge is awkward. Proof of Promise puts money on the line and lets Swappy be the neutral judge: it reads the real evidence and settles the stake.
 
-Built for Rise In Agentmaxxing. Week 2: settlement is simulated (no real transfers), and friend backing via x402 is stubbed.
+Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes are real testnet USDC in an escrow contract. Friend backing via x402 is still stubbed.
 
 ## Key features
 
@@ -24,6 +24,16 @@ Built for Rise In Agentmaxxing. Week 2: settlement is simulated (no real transfe
 - Full trace on every card: tools called, evidence, verdict, settlement
 - Never slashes an unverified stake. Failed checks stay `pending`
 - Clear errors when Gemini is missing or busy (45s timeout per call, one retry)
+
+## Week 2
+
+- **Ask Swappy:** one text box at the top. Type "send 1 USDC to 0x...", "I promise to push 3 commits by Friday, stake 1 USDC" or "back the running promise with 0.5 USDC" and Swappy turns it into a send, a prefilled promise form, or a backing
+- **Natural-language sends:** you always see a review card first. Small sends (up to 2 USDC or 0.001 ETH) can go from the agent wallet; anything bigger goes from your own wallet. Agent sends are rate-limited per IP and per day
+- **Real escrow:** stakes are locked in the escrow contract on Base Sepolia (`0x0cb3d1093AeD5E812f2f4Fd1a3cF92f93868782d`). Funding uses one batched call, a USDC permit, or approve + create, depending on the wallet
+- **Backing from a wallet:** friends can add USDC to an open promise, and it is credited after the transfer is checked on chain
+- **Chain-state reads:** stake, backing and status on each card come from the escrow, not the database. If the RPC is down it falls back to the saved copy
+- **Expire and refund:** if nobody settles a promise by the deadline plus the grace period, anyone can expire it and the stake and backings go back to whoever put them in
+- Wallet errors in plain words (wrong network, rejected, not enough USDC)
 
 ## How it works
 
@@ -71,7 +81,17 @@ From `agent/tools.ts`:
 | `check_strava_activity` | Strava check. Not connected yet, so it reports unverified and nothing settles |
 | `record_verdict` | Saves the final verdict (`kept`, `broken`, `pending`) with a short explanation citing the evidence |
 
-Settlement (`settleStake` in `agent/wallet.ts`) runs after the verdict, outside the model.
+Settlement (`settleStake` in `agent/wallet.ts`) runs after the verdict, outside the model. For promises staked in the escrow it calls `settle` on chain; older promises without an escrow stake are settled as simulated.
+
+Ask Swappy (`POST /api/ask`, `lib/intent.ts`, `lib/transfer.ts`) adds:
+
+| Tool | What it does |
+| --- | --- |
+| Create promise | Reads "I promise to..." and fills the promise form. You review and fund it from your wallet |
+| Back promise | Finds the promise you mean by id or title and backs it with USDC from your wallet |
+| Send tokens | Parses "send 1 USDC to 0x..." into a transfer. Agent wallet sends are capped at 2 USDC (0.001 ETH) per transfer and need a Confirm click |
+| Chain-state read | `lib/chain-state.ts` reads `getPromise` and the grace period from the escrow for every promise |
+| Expire and refund | Calls `expire` on the escrow after deadline + grace, returning the stake to the maker and backers |
 
 ## AI models
 
@@ -90,7 +110,7 @@ Settlement (`settleStake` in `agent/wallet.ts`) runs after the verdict, outside 
 | TypeScript | 5.9.3 |
 | Tailwind CSS | 4.3.3 |
 | Google Gen AI SDK (`@google/genai`) | 2.28.0 |
-| viem (Base Sepolia, week 3 signing) | 2.57.4 |
+| viem (Base Sepolia escrow, wallet, transfers) | 2.57.4 |
 | Upstash Redis (REST API via `fetch`, no SDK) | n/a |
 | Node.js | 20+ |
 | Hosting | Vercel (Node.js runtime) |
@@ -115,7 +135,7 @@ npm run dev
 | `GEMINI_MODEL` | No | Default `gemini-3.6-flash` (tool calling and images) |
 | `GITHUB_TOKEN` | No | Public commits only; helps rate limits |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | No | Upstash Redis REST (set by the Vercel Marketplace integration). `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` also work. Without them promises go to a local file |
-| `WALLET_PRIVATE_KEY` | No | Week 3. Week 2 settlement does not sign or broadcast |
+| `WALLET_PRIVATE_KEY` | No | Agent wallet on Base Sepolia. Settles escrow stakes and sends small transfers. Testnet only |
 
 Do not commit `.env`, `.agent-wallet.json`, or `data/`.
 
@@ -133,22 +153,23 @@ Past deadlines are allowed, so a GitHub window that already ended can be checked
 
 ## Demo links
 
-Week 1 (proofofpromise.v1): n/a  
-Week 2 (proofofpromise.v2): https://youtu.be/mULHLHCVfV4  
-Week 3 (proofofpromise.v3): coming soon
+Week 1 (proofofpromise.v1): https://youtu.be/mULHLHCVfV4  
+Week 2 (proofofpromise.v2): TODO (adii: Week 2 demo video with voiceover)  
+Week 3 (proofofpromise.v3): TODO
 
 Live: https://proof-of-promise.vercel.app
 
 ## Future scope
 
-- Real USDC escrow on Base Sepolia: lock on create, refund on kept, pay the beneficiary on broken
 - x402 friend backing: friends pay to back a promise through `POST /api/promises/:id/back`
 - Strava OAuth behind `agent/proofs/strava.ts`
-- Auto-post results to X
+- Auto-post results to X from @swappy_ai
+- Mainnet once the escrow is audited
+- Group promises, where a few friends stake on the same goal
 
 ## Social
 
-X: [@swappy_ai](https://x.com/swappy_ai)
+X: [@swappy_ai](https://x.com/swappy_ai) · Built for [@riseinweb3](https://x.com/riseinweb3)
 
 ## License
 
