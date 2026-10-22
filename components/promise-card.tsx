@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
 import { txUrl } from "@/lib/escrow";
-import { expireOnchain } from "@/lib/fund";
+import { backWithX402, expireOnchain } from "@/lib/fund";
+import { Input } from "@/components/ui/input";
 import { walletErrorMessage } from "@/lib/wallet-error";
 import { useWallet } from "@/components/wallet-provider";
 import { needsOnchainSettle } from "@/lib/stake";
@@ -80,6 +81,10 @@ export function PromiseCard({
   const label = expired ? "Expired" : promise.verdict ? VERDICT_LABEL[promise.verdict] : checking ? "Checking" : "Open";
   const stake = chainState?.stakeUsdc ?? promise.stakeUsdc;
   const backed = chainState ? Number(chainState.backedUsdc) : (promise.backings ?? []).reduce((sum, b) => sum + Number(b.amountUsdc), 0);
+  const canBack = chainState?.status === "open" && now < new Date(promise.deadline).getTime() && !promise.verdict;
+  const [backAmount, setBackAmount] = useState("0.5");
+  const [backStep, setBackStep] = useState<string | null>(null);
+  const [backError, setBackError] = useState<string | null>(null);
   const canExpire = chainState?.status === "open" && now > new Date(chainState.expiresAt).getTime();
 
   useEffect(() => {
@@ -100,6 +105,20 @@ export function PromiseCard({
       setExpireError(walletErrorMessage(err));
     }
     setExpiring(false);
+  }
+
+  async function back() {
+    setBackError(null);
+    setBackStep("Connecting your wallet…");
+    try {
+      const from = wallet.account ?? (await wallet.connect());
+      if (!from) throw new Error(wallet.error || "Connect a wallet first.");
+      await backWithX402(promise.id, backAmount, from, setBackStep);
+      await onUploaded();
+    } catch (err) {
+      setBackError(walletErrorMessage(err));
+    }
+    setBackStep(null);
   }
 
   useEffect(() => {
@@ -149,6 +168,26 @@ export function PromiseCard({
         {promise.backings?.map((b) => (
           <TxLink key={b.creditTx} label={`Backed with ${formatUsdc(b.amountUsdc)} USDC`} hash={b.creditTx} />
         ))}
+
+        {canBack && (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-muted-foreground">Back this promise with x402. You sign once, no gas. Kept: you get it back. Broken: it goes to {promise.beneficiaryName}.</p>
+            <div className="flex gap-2">
+              <Input
+                aria-label="Backing in USDC"
+                inputMode="decimal"
+                value={backAmount}
+                onChange={(e) => setBackAmount(e.target.value)}
+                className="h-11 w-28"
+              />
+              <Button type="button" variant="outline" disabled={Boolean(backStep)} onClick={back} className="h-11">
+                {backStep ? "Backing…" : "Back with USDC"}
+              </Button>
+            </div>
+            {backStep && <p className="text-sm text-muted-foreground">{backStep}</p>}
+            {backError && <p className="text-sm text-destructive">{backError}</p>}
+          </div>
+        )}
 
         {expired && <p className="border px-3 py-2 text-sm">Expired on-chain. The stake and any backing went back to whoever put it in.</p>}
 

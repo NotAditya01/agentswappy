@@ -12,7 +12,7 @@ Stake USDC on a personal promise. Swappy checks your proof (GitHub, photo, Strav
 
 Everyone says "I'll ship it this week" or "I'll start running." Nothing happens when we don't. Telling friends doesn't stick, and asking a friend to judge is awkward. Proof of Promise puts money on the line and lets Swappy be the neutral judge: it reads the real evidence and settles the stake.
 
-Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes are real testnet USDC in an escrow contract. Friend backing via x402 is still stubbed.
+Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes are real testnet USDC in an escrow contract. Friends back promises with x402 payments that land in the same escrow.
 
 ## Key features
 
@@ -31,6 +31,7 @@ Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes 
 - **Natural-language sends:** you always see a review card first. Small sends (up to 2 USDC or 0.001 ETH) can go from the agent wallet; anything bigger goes from your own wallet. Agent sends are rate-limited per IP and per day
 - **Real escrow:** stakes are locked in the escrow contract on Base Sepolia (`0x0cb3d1093AeD5E812f2f4Fd1a3cF92f93868782d`). Funding uses one batched call, a USDC permit, or approve + create, depending on the wallet
 - **Backing from a wallet:** friends can add USDC to an open promise, and it is credited after the transfer is checked on chain
+- **x402 backing:** `POST /api/promises/:id/back?amount=0.5` answers 402 with the price. The friend signs a USDC authorization (no gas), the x402.org facilitator moves it into the escrow, and Swappy calls `creditBacking` so refunds and payouts include it. The card has a "Back with USDC" button for this
 - **Chain-state reads:** stake, backing and status on each card come from the escrow, not the database. If the RPC is down it falls back to the saved copy
 - **Expire and refund:** if nobody settles a promise by the deadline plus the grace period, anyone can expire it and the stake and backings go back to whoever put them in
 - Wallet errors in plain words (wrong network, rejected, not enough USDC)
@@ -56,8 +57,11 @@ flowchart TD
   Verdict --> Store
   Refund -.->|week 3| Chain["USDC escrow on Base Sepolia"]
   Payout -.->|week 3| Chain
-  Friend["Friend"] -.->|x402, week 3| Back["POST /api/promises/:id/back"]
-  Back -.-> Store
+  Friend["Friend"] -->|x402 payment| Back["POST /api/promises/:id/back"]
+  Back -->|verify + settle| Facilitator["x402 facilitator"]
+  Facilitator -->|USDC| Chain
+  Back -->|creditBacking| Chain
+  Back --> Store
 ```
 
 
@@ -89,6 +93,7 @@ Ask Swappy (`POST /api/ask`, `lib/intent.ts`, `lib/transfer.ts`) adds:
 | --- | --- |
 | Create promise | Reads "I promise to..." and fills the promise form. You review and fund it from your wallet |
 | Back promise | Finds the promise you mean by id or title and backs it with USDC from your wallet |
+| x402 backing | `lib/x402.ts` builds the 402 price, signs the EIP-3009 payment in the browser, and verifies/settles it through the facilitator before `creditBacking` |
 | Send tokens | Parses "send 1 USDC to 0x..." into a transfer. Agent wallet sends are capped at 2 USDC (0.001 ETH) per transfer and need a Confirm click |
 | Chain-state read | `lib/chain-state.ts` reads `getPromise` and the grace period from the escrow for every promise |
 | Expire and refund | Calls `expire` on the escrow after deadline + grace, returning the stake to the maker and backers |
@@ -135,7 +140,8 @@ npm run dev
 | `GEMINI_MODEL` | No | Default `gemini-3.6-flash` (tool calling and images) |
 | `GITHUB_TOKEN` | No | Public commits only; helps rate limits |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | No | Upstash Redis REST (set by the Vercel Marketplace integration). `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` also work. Without them promises go to a local file |
-| `WALLET_PRIVATE_KEY` | No | Agent wallet on Base Sepolia. Settles escrow stakes and sends small transfers. Testnet only |
+| `WALLET_PRIVATE_KEY` | No | Agent wallet on Base Sepolia. Settles escrow stakes, credits backings and sends small transfers. Testnet only |
+| `X402_FACILITATOR_URL` | No | Default `https://x402.org/facilitator` (free, Base Sepolia) |
 
 Do not commit `.env`, `.agent-wallet.json`, or `data/`.
 
@@ -160,7 +166,6 @@ Live: https://proof-of-promise.vercel.app
 
 ## Future scope
 
-- x402 friend backing: friends pay to back a promise through `POST /api/promises/:id/back`
 - Strava OAuth behind `agent/proofs/strava.ts`
 - Auto-post results to X from @swappy_ai
 - Mainnet once the escrow is audited

@@ -61,3 +61,22 @@ export async function creditWalletBacking(promiseId: string, txHash: string): Pr
   const saved = await savePromise(promiseId, { backings: [...(promise.backings ?? []), backing] });
   return saved ?? promise;
 }
+
+// Before asking a friend to pay, make sure the escrow can still take a backing for this promise.
+export async function assertBackable(promiseId: string): Promise<PromiseRecord> {
+  const escrow = ESCROW_ADDRESS;
+  if (!escrow || !process.env.WALLET_PRIVATE_KEY) throw new BackingError("The escrow is not configured on this server.");
+  const promise = await getPromise(promiseId);
+  if (!promise) throw new BackingError("Promise not found.", 404);
+  if (!promise.onchain) throw new BackingError("This promise has no stake in the escrow.");
+  const onchain = await publicClient().readContract({
+    address: escrow,
+    abi: escrowAbi,
+    functionName: "getPromise",
+    args: [promise.onchain.escrowId as Hex],
+  });
+  if (onchain.status !== STATUS_OPEN || Number(onchain.deadline) * 1000 <= Date.now() + 60_000) {
+    throw new BackingError("This promise is closed in the escrow, so it can't be backed.");
+  }
+  return promise;
+}

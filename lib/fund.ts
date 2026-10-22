@@ -15,6 +15,8 @@ import { chain, ESCROW_ADDRESS, escrowAbi, escrowId, USDC_ADDRESS, usdcAbi, usdc
 import { chooseFundPath, isUserRejection } from "./fund-path";
 import { escrowHasPermit, signPermit, usdcHasPermit, type Reader } from "./permit";
 import { erc20TransferAbi, toUnits, type Transfer } from "./transfer";
+import { signPayment, type PaymentRequirements } from "./x402";
+import type { PromiseRecord } from "./types";
 
 declare global {
   interface Window {
@@ -167,6 +169,30 @@ export async function sendBacking(amountUsdc: string, from: Address): Promise<He
   const receipt = await reader.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error(`The transfer reverted. Tx ${hash}`);
   return hash;
+}
+
+// x402: ask the back endpoint for its price, sign a USDC authorization (no gas), and pay.
+export async function backWithX402(promiseId: string, amountUsdc: string, from: Address, onStep?: FundStep): Promise<PromiseRecord> {
+  const url = `/api/promises/${promiseId}/back?amount=${encodeURIComponent(amountUsdc)}`;
+  const first = await fetch(url, { method: "POST" });
+  const quote = await first.json();
+  if (first.status !== 402) throw new Error(quote.error || "The back endpoint did not ask for a payment.");
+  const req = quote.accepts?.[0] as PaymentRequirements | undefined;
+  if (!req) throw new Error("The back endpoint sent no payment details.");
+
+  const wallet = createWalletClient({ account: from, chain, transport: custom(provider()) });
+  const reader = createPublicClient({ chain, transport: http() });
+  await onBaseSepolia(wallet);
+  const balance = await reader.readContract({ address: USDC_ADDRESS, abi: usdcAbi, functionName: "balanceOf", args: [from] });
+  if (balance < BigInt(req.maxAmountRequired)) throw new Error("Not enough test USDC in this wallet. Get some from the Circle faucet.");
+
+  onStep?.("Sign the USDC payment in your wallet…");
+  const header = await signPayment(wallet as unknown as Parameters<typeof signPayment>[0], from, req);
+  onStep?.("Paying and crediting your backing…");
+  const paid = await fetch(url, { method: "POST", headers: { "X-PAYMENT": header } });
+  const data = await paid.json();
+  if (!paid.ok) throw new Error(data.paymentTx ? `${data.error} Your payment: ${data.paymentTx}` : data.error || "The payment failed.");
+  return data as PromiseRecord;
 }
 
 // Anyone can expire a promise once the agent missed the grace window; funds go back to the maker and backers.

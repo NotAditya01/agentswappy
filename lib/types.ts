@@ -85,16 +85,6 @@ export type SettlementIntent = {
   beneficiaryAddress: string;
 };
 
-export type StakeBackResult = {
-  status: "stub";
-  week: 3;
-  promiseId: string;
-  amountUsdc: string;
-  asset: "USDC";
-  network: "base-sepolia";
-  message: string;
-};
-
 export type Backing = { backer: string; amountUsdc: string; txHash: string; creditTx: string; at: string };
 
 export type ChainState = {
