@@ -170,7 +170,7 @@ export function PromiseDetail({
           <h1 className="text-2xl font-semibold tracking-[-0.02em] break-words sm:text-3xl">{promise.description}</h1>
         </div>
 
-        <dl className="grid grid-cols-[140px_minmax(0,1fr)] gap-x-6 gap-y-3 border-t pt-6 text-sm">
+        <dl className="grid grid-cols-[88px_minmax(0,1fr)] gap-x-4 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-x-6 gap-y-3 border-t pt-6 text-sm">
           <KV k="Amount"><span className="font-mono">{formatUsdc(String(total))} USDC</span>{backed > 0 && <span className="text-muted-foreground"> · <span className="font-mono">{formatUsdc(String(stake))}</span> stake + <span className="font-mono">{formatUsdc(String(backed))}</span> backed</span>}</KV>
           <KV k="Deadline"><span className="font-mono">{formatWhen(promise.deadline)}</span><span className="text-muted-foreground"> · <span className="font-mono">{countdown(promise.deadline, now)}</span></span></KV>
           <KV k="Proof">{PROOF_LABEL[promise.proofType]} · {promise.target}</KV>
