@@ -287,13 +287,13 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
               hint={
                 account ? (
                   <>
-                    Test USDC on Base Sepolia.{" "}
+                    Locks real test USDC on Base Sepolia from your wallet.{" "}
                     <a href={FAUCET_URL} target="_blank" rel="noreferrer" className="underline">
                       Get some from the Circle faucet
                     </a>
                   </>
                 ) : (
-                  "Simulated for now. Connect a wallet to use real test USDC."
+                  "Connect a wallet to lock test USDC. Without one, the payout is only simulated."
                 )
               }
             >

@@ -125,9 +125,12 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
 
   return (
     <section className="flex flex-col gap-3 border px-4 py-5">
-      <div>
+      <div className="flex items-center gap-4">
+        <img src="/logo.png" alt="" width={64} height={64} className="size-16 shrink-0" />
+        <div>
         <h2 className="text-xl font-semibold tracking-tight">Ask Swappy</h2>
         <p className="mt-1 text-sm text-muted-foreground">Prefer typing? Tell Swappy what you want in plain words. Nothing happens until you confirm.</p>
+        </div>
       </div>
       <form onSubmit={ask} className="flex flex-col gap-2 sm:flex-row">
         <input

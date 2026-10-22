@@ -8,6 +8,8 @@ import type { PromisePrefill } from "@/lib/intent";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/wallet-button";
 import type { PromiseRecord } from "@/lib/types";
+import type { Stats } from "@/lib/stats";
+import { formatUsdc } from "@/lib/format";
 
 type Tab = "promises" | "make" | "ask";
 const TABS: [Tab, string][] = [
@@ -31,6 +33,7 @@ type Meta = {
 export function Dashboard() {
   const [promises, setPromises] = useState<PromiseRecord[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
@@ -42,6 +45,7 @@ export function Dashboard() {
     if (!res.ok) throw new Error(data.error || "Could not load promises.");
     setPromises(data.promises ?? []);
     setMeta(data.meta ?? null);
+    setStats(data.stats ?? null);
     return (data.promises ?? []) as PromiseRecord[];
   }
 
@@ -139,6 +143,22 @@ export function Dashboard() {
         {meta?.settlement !== "escrow" && <p className="text-sm text-muted-foreground">Money is simulated here.</p>}
       </header>
 
+      {stats && (
+        <dl className="grid grid-cols-3 border text-center">
+          {[
+            [`${formatUsdc(String(stats.lockedUsdc))}`, "USDC locked now"],
+            [String(stats.kept), "promises kept"],
+            [String(stats.backers), stats.backers === 1 ? "backer" : "backers"],
+          ].map(([value, name]) => (
+            <div key={name} className="border-r px-2 py-2 last:border-r-0">
+              <dt className="sr-only">{name}</dt>
+              <dd className="text-lg font-semibold tabular-nums">{value}</dd>
+              <dd className="text-xs text-muted-foreground">{name}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
       <div role="tablist" aria-label="Sections" className="grid grid-cols-3 border">
         {TABS.map(([id, name]) => (
           <button
@@ -149,7 +169,14 @@ export function Dashboard() {
             onClick={() => go(id)}
             className={`h-11 px-2 text-sm ${tab === id ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
           >
-            {name}
+            {id === "make" ? (
+              <>
+                <span className="sm:hidden">New</span>
+                <span className="hidden sm:inline">{name}</span>
+              </>
+            ) : (
+              name
+            )}
             {id === "promises" && !loading && promises.length > 0 ? ` (${promises.length})` : ""}
           </button>
         ))}
@@ -199,13 +226,16 @@ export function Dashboard() {
             </div>
           )}
           {!loading && !error && filtered.length === 0 && (
-            <div className="border px-4 py-5">
+            <div className="flex items-center gap-4 border px-4 py-5">
+              {promises.length === 0 && <img src="/logo.png" alt="" width={72} height={72} className="size-18 shrink-0" />}
+              <div>
               <p className="font-medium">{promises.length === 0 ? "No promises yet" : `No ${filter} promises`}</p>
               {promises.length === 0 && (
                 <button type="button" onClick={() => go("make")} className="mt-2 text-sm text-primary underline underline-offset-4">
                   Make your first promise
                 </button>
               )}
+              </div>
             </div>
           )}
           <div className="flex flex-col gap-2">
