@@ -15,3 +15,9 @@ test("a short rate limit is retried once, then reported busy", async () => {
   await assert.rejects(callGemini(async () => { calls++; throw limited; }), { message: GEMINI_BUSY });
   assert.equal(calls, 2);
 });
+
+test("geminiFailure does not repeat the settled note", async () => {
+  const { geminiFailure } = await import("./model");
+  const err = geminiFailure("Gemini could not look at the photo.", new Error("Quota used up. Nothing was settled."));
+  assert.equal(err.message.match(/Nothing was settled/g)?.length, 1);
+});

@@ -12,7 +12,8 @@ export function geminiFailure(prefix: string, err: unknown): Error {
   const raw = err instanceof Error ? err.message : String(err);
   const key = process.env.GEMINI_API_KEY?.trim();
   const cleaned = (key ? raw.split(key).join("the API key") : raw).replace(/\s+/g, " ").slice(0, 300);
-  return new Error(`${prefix} ${cleaned} Nothing was settled.`);
+  const tail = /Nothing was settled\.?\s*$/.test(cleaned) ? "" : " Nothing was settled.";
+  return new Error(`${prefix} ${cleaned}${tail}`);
 }
 
 export const GEMINI_DAILY_QUOTA = "Gemini's daily free quota for this app is used up. It resets within a day. Nothing was settled.";
