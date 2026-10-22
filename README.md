@@ -35,6 +35,7 @@ Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes 
 - **Chain-state reads:** stake, backing and status on each card come from the escrow, not the database. If the RPC is down it falls back to the saved copy
 - **Expire and refund:** if nobody settles a promise by the deadline plus the grace period, anyone can expire it and the stake and backings go back to whoever put them in
 - Wallet errors in plain words (wrong network, rejected, not enough USDC)
+- **Strava proof:** "Connect Strava" on a Strava promise card (scope `activity:read_all`). Tokens are kept per promise in Redis and refreshed when they expire. The check counts activities of the right type and distance between creation and the deadline
 
 ## How it works
 
@@ -47,7 +48,7 @@ flowchart TD
   Check --> Agent["Gemini agent"]
   Agent --> GH["GitHub commits API"]
   Agent --> Vision["Gemini vision"]
-  Agent --> Strava["Strava stub"]
+  Agent --> Strava["Strava activities API"]
   GH --> Agent
   Vision --> Agent
   Strava --> Agent
@@ -67,7 +68,7 @@ flowchart TD
 
 You write a promise (what, deadline, proof, stake, and who receives it if you break it). The list starts empty. **Try an example** only fills the form.
 
-**Check proof** asks Gemini to call the matching tool, read the result, and record the verdict. GitHub reads the live commits API for the repository and date window you entered. A photo is sent to Gemini vision. Strava is not connected, so that tool reports it cannot verify and the stake stays unsettled. If `GEMINI_API_KEY` is missing or Gemini errors, the page shows the error and nothing is settled.
+**Check proof** asks Gemini to call the matching tool, read the result, and record the verdict. GitHub reads the live commits API for the repository and date window you entered. A photo is sent to Gemini vision. Strava reads your activities between when the promise was made and the deadline, after you connect Strava on the card. If Strava isn't connected or configured, the check stays `pending` and nothing is settled. If `GEMINI_API_KEY` is missing or Gemini errors, the page shows the error and nothing is settled.
 
 `kept` and `broken` call `settleStake()` in `agent/wallet.ts` with `mocked: true` and no `txHash`. The page labels that settlement simulated.
 
@@ -82,7 +83,7 @@ From `agent/tools.ts`:
 | --- | --- |
 | `check_github_commits` | Counts public commits on the promise's repo, author and date window via the GitHub API |
 | `check_image_proof` | Sends the uploaded photo to Gemini vision and returns whether it shows the claim |
-| `check_strava_activity` | Strava check. Not connected yet, so it reports unverified and nothing settles |
+| `check_strava_activity` | Reads your Strava activities in the promise window and counts the ones that match the type, distance and number of times |
 | `record_verdict` | Saves the final verdict (`kept`, `broken`, `pending`) with a short explanation citing the evidence |
 
 Settlement (`settleStake` in `agent/wallet.ts`) runs after the verdict, outside the model. For promises staked in the escrow it calls `settle` on chain; older promises without an escrow stake are settled as simulated.
@@ -141,6 +142,7 @@ npm run dev
 | `GITHUB_TOKEN` | No | Public commits only; helps rate limits |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | No | Upstash Redis REST (set by the Vercel Marketplace integration). `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` also work. Without them promises go to a local file |
 | `WALLET_PRIVATE_KEY` | No | Agent wallet on Base Sepolia. Settles escrow stakes, credits backings and sends small transfers. Testnet only |
+| `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` | No | From your [Strava API app](https://www.strava.com/settings/api). Set the Authorization Callback Domain to your site's domain. Needs Redis. Without them the card says Strava isn't configured |
 | `X402_FACILITATOR_URL` | No | Default `https://x402.org/facilitator` (free, Base Sepolia) |
 
 Do not commit `.env`, `.agent-wallet.json`, or `data/`.
@@ -166,8 +168,7 @@ Live: https://proof-of-promise.vercel.app
 
 ## Future scope
 
-- Strava OAuth behind `agent/proofs/strava.ts`
-- Auto-post results to X from @swappy_ai
+- More activity sources (Apple Health, Garmin)
 - Mainnet once the escrow is audited
 - Group promises, where a few friends stake on the same goal
 
