@@ -3,7 +3,6 @@
 import { walletErrorMessage } from "@/lib/wallet-error";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, controlClass } from "@/components/field";
 import { toLocalInput } from "@/lib/format";
@@ -78,6 +77,12 @@ function parseRepo(input: string): { owner: string; repo: string } | null {
   return { owner: parts[0], repo: parts[1] };
 }
 
+const PAGES = ["The promise", "The proof", "The stakes"];
+const PAGE_OF: Record<keyof FormState, number> = {
+  description: 0, deadline: 0, proofType: 1, repo: 1, minCommits: 1, since: 1, claim: 1,
+  stakeUsdc: 2, beneficiaryName: 2, beneficiaryAddress: 2,
+};
+
 type Problems = Partial<Record<keyof FormState, string>>;
 
 function problemsOf(form: FormState, walletStake: boolean): Problems {
@@ -111,9 +116,20 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
   const [step, setStep] = useState<string | null>(null);
   const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [page, setPage] = useState(0);
   const problems = problemsOf(form, Boolean(account));
   const show = (key: keyof FormState) => (submitted || touched[key] ? problems[key] : undefined);
   const blur = (key: keyof FormState) => () => setTouched((t) => ({ ...t, [key]: true }));
+  const firstBad = (Object.keys(problems) as (keyof FormState)[]).map((k) => PAGE_OF[k]).sort()[0];
+
+  function next() {
+    const bad = (Object.keys(problems) as (keyof FormState)[]).filter((k) => PAGE_OF[k] === page);
+    if (bad.length) {
+      setTouched((t) => ({ ...t, ...Object.fromEntries(bad.map((k) => [k, true])) }));
+      return;
+    }
+    setPage((n) => n + 1);
+  }
 
   useEffect(() => setWalletAvailable(hasWallet()), []);
 
@@ -134,6 +150,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
     });
     setExampleNote(false);
     setError(null);
+    setPage(0);
   }, [prefill]);
 
   async function connect() {
@@ -151,6 +168,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
     setFile(null);
     setError(null);
     setExampleNote(true);
+    setPage(0);
   }
 
   async function submit(event: FormEvent) {
@@ -159,6 +177,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
     setError(null);
     if (Object.keys(problems).length > 0) {
       setError("Fix the highlighted fields first.");
+      if (firstBad !== undefined) setPage(firstBad);
       return;
     }
     setSaving(true);
@@ -234,6 +253,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
       setFile(null);
       setExampleNote(false);
       setTouched({});
+      setPage(0);
       setSubmitted(false);
       await onCreated();
     } catch (err) {
@@ -244,19 +264,21 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
   }
 
   return (
-    <Card>
-      <CardHeader className="gap-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">Make a promise</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Takes about a minute. Not sure? Try the example.</p>
-          </div>
-          <Button type="button" variant="outline" onClick={tryExample} className="h-11">
-            Try an example
-          </Button>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-3 pr-10">
+        <div>
+          <h2 className="font-display text-2xl font-bold">Make a promise</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Step {page + 1} of 3 · {PAGES[page]}</p>
         </div>
-      </CardHeader>
-      <CardContent>
+        <Button type="button" variant="outline" size="sm" onClick={tryExample}>
+          Try an example
+        </Button>
+      </div>
+      <div className="grid grid-cols-3 gap-2" aria-hidden>
+        {PAGES.map((name, i) => (
+          <span key={name} className={`h-2 rounded-full transition-colors ${i <= page ? "bg-primary" : "bg-muted"}`} />
+        ))}
+      </div>
         <form className="flex flex-col gap-3" onSubmit={submit} noValidate>
           {exampleNote && (
             <p className="text-sm text-muted-foreground">
@@ -264,6 +286,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
             </p>
           )}
 
+          {page === 0 && (
           <Field label="What will you do?" error={show("description")}>
             <textarea
               value={form.description}
@@ -272,41 +295,30 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
               aria-invalid={Boolean(show("description"))}
               required
               rows={2}
-              placeholder="Ship one commit to my repo"
+              placeholder="Run 5k three times this week"
               className={`${controlClass} min-h-16`}
             />
           </Field>
+          )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          {page === 0 && (
+          <>
+          <div className="grid gap-3">
             <Field label="Deadline" error={show("deadline")}>
               <Input type="datetime-local" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} onBlur={blur("deadline")} aria-invalid={Boolean(show("deadline"))} required className="h-11 text-base md:text-base" />
             </Field>
-            <Field
-              label="How much to put on it (USDC)"
-              error={show("stakeUsdc")}
-              hint={
-                account ? (
-                  <>
-                    Locks real test USDC on Base Sepolia from your wallet.{" "}
-                    <a href={FAUCET_URL} target="_blank" rel="noreferrer" className="underline">
-                      Get some from the Circle faucet
-                    </a>
-                  </>
-                ) : (
-                  "Connect a wallet to lock test USDC. Without one, the payout is only simulated."
-                )
-              }
-            >
-              <Input value={form.stakeUsdc} onChange={(event) => set("stakeUsdc", event.target.value)} onBlur={blur("stakeUsdc")} aria-invalid={Boolean(show("stakeUsdc"))} inputMode="decimal" required className="h-11 text-base md:text-base" />
-            </Field>
           </div>
+          </>
+          )}
 
+          {page === 1 && (
+          <>
           <Field label="How will you prove it?" hint={PROOF_HELP[form.proofType]}>
             <div className="grid grid-cols-2 gap-2">
               {(
                 [
-                  ["github_commits", "GitHub"],
-                  ["image", "Photo"],
+                  ["github_commits", "GitHub commits"],
+                  ["image", "Photo or screenshot"],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -314,7 +326,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
                   type="button"
                   aria-pressed={form.proofType === value}
                   onClick={() => set("proofType", value)}
-                  className={`h-11 border text-sm ${form.proofType === value ? "border-primary bg-primary text-primary-foreground" : "border-input hover:border-primary"}`}
+                  className={`h-14 rounded-2xl border-2 font-bold transition-colors ${form.proofType === value ? "border-primary bg-primary/15 text-primary" : "border-input hover:border-primary/60"}`}
                 >
                   {label}
                 </button>
@@ -370,6 +382,29 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
             </div>
           )}
 
+          </>
+          )}
+
+          {page === 2 && (
+          <>
+          <Field
+              label="How much to put on it (USDC)"
+              error={show("stakeUsdc")}
+              hint={
+                account ? (
+                  <>
+                    Locks real test USDC on Base Sepolia from your wallet.{" "}
+                    <a href={FAUCET_URL} target="_blank" rel="noreferrer" className="underline">
+                      Get some from the Circle faucet
+                    </a>
+                  </>
+                ) : (
+                  "Connect a wallet to lock test USDC. Without one, the payout is only simulated."
+                )
+              }
+            >
+              <Input value={form.stakeUsdc} onChange={(event) => set("stakeUsdc", event.target.value)} onBlur={blur("stakeUsdc")} aria-invalid={Boolean(show("stakeUsdc"))} inputMode="decimal" required className="h-11 text-base md:text-base" />
+            </Field>
           <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Who gets the money if you miss it?" hint="A friend, a rival, a cause. Picking someone you'd hate to pay works best." error={show("beneficiaryName")}>
             <Input value={form.beneficiaryName} onChange={(event) => set("beneficiaryName", event.target.value)} onBlur={blur("beneficiaryName")} aria-invalid={Boolean(show("beneficiaryName"))} placeholder="A friend" required className="h-11 text-base md:text-base" />
@@ -398,6 +433,9 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
             </div>
           )}
 
+          </>
+          )}
+
           {step && (
             <p aria-live="polite" className="text-sm">
               {step}
@@ -410,11 +448,23 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
             </p>
           )}
 
-          <Button type="submit" disabled={saving} className="h-11 w-full sm:w-fit">
-            {saving ? step ?? "Saving…" : account ? `Make the promise and lock ${form.stakeUsdc || "0"} USDC` : "Make the promise"}
-          </Button>
+          <div className="mt-2 flex gap-3">
+            {page > 0 && (
+              <Button type="button" variant="outline" disabled={saving} onClick={() => setPage((n) => n - 1)} className="h-12 px-5">
+                Back
+              </Button>
+            )}
+            {page < 2 ? (
+              <Button type="button" onClick={next} className="h-12 flex-1">
+                Next
+              </Button>
+            ) : (
+              <Button type="submit" disabled={saving} className="h-12 flex-1">
+                {saving ? step ?? "Saving…" : account ? `Lock ${form.stakeUsdc || "0"} USDC and promise` : "Make the promise"}
+              </Button>
+            )}
+          </div>
         </form>
-      </CardContent>
-    </Card>
+    </div>
   );
 }

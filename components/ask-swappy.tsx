@@ -3,7 +3,6 @@
 import { walletErrorMessage } from "@/lib/wallet-error";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { controlClass } from "@/components/field";
 import { useWallet } from "@/components/wallet-provider";
 import { txUrl } from "@/lib/escrow";
 import { formatUsdc } from "@/lib/format";
@@ -124,43 +123,44 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
     intent?.kind === "send" && sender === "agent" && Number(intent.transfer.amount) > Number(reply?.agentCap[intent.transfer.token]);
 
   return (
-    <section className="flex flex-col gap-3 border px-4 py-5">
-      <div className="flex items-center gap-4">
-        <img src="/logo.png" alt="" width={64} height={64} className="size-16 shrink-0" />
-        <div>
-        <h2 className="text-xl font-semibold tracking-tight">Ask Swappy</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Prefer typing? Tell Swappy what you want in plain words. Nothing happens until you confirm.</p>
+    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5 rounded-[2rem] border-2 bg-card p-5 sm:p-8">
+      <div className="flex items-end gap-3">
+        <img src="/logo.png" alt="Swappy" width={88} height={88} className="size-20 shrink-0 sm:size-24" />
+        <div className="relative rounded-3xl rounded-bl-md bg-muted px-5 py-4">
+          <h2 className="font-display text-2xl font-bold">Ask Swappy</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Tell me what you want in plain words. I&apos;ll show you the plan, and nothing happens until you confirm.</p>
         </div>
       </div>
-      <form onSubmit={ask} className="flex flex-col gap-2 sm:flex-row">
-        <input
-          className={controlClass}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Tell Swappy what to do"
-          disabled={Boolean(busy)}
-        />
-        <Button type="submit" size="lg" disabled={Boolean(busy) || !prompt.trim()}>
-          Ask
-        </Button>
-      </form>
       <div className="flex flex-wrap gap-2">
         {EXAMPLES.map((example) => (
           <button
             key={example}
             type="button"
-            className="border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+            className="rounded-full border-2 px-3 py-1.5 text-left text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/60 hover:text-foreground"
             onClick={() => setPrompt(example)}
           >
             {example}
           </button>
         ))}
       </div>
+      <form onSubmit={ask} className="flex gap-2 rounded-full border-2 border-input bg-background p-1.5 focus-within:border-primary">
+        <input
+          className="min-w-0 flex-1 bg-transparent px-4 text-base outline-none"
+          aria-label="Message Swappy"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="I promise to…"
+          disabled={Boolean(busy)}
+        />
+        <Button type="submit" disabled={Boolean(busy) || !prompt.trim()} className="h-11 rounded-full px-6">
+          Send
+        </Button>
+      </form>
 
-      {intent?.kind === "clarify" && <p className="text-sm">{intent.question}</p>}
+      {intent?.kind === "clarify" && <p className="w-fit max-w-full rounded-3xl rounded-tl-md bg-muted px-4 py-3 text-sm">{intent.question}</p>}
 
       {intent && intent.kind !== "clarify" && (
-        <div className="flex flex-col gap-3 border px-4 py-4 text-sm">
+        <div className="pop flex flex-col gap-3 rounded-3xl rounded-tl-md bg-muted px-5 py-4 text-sm">
           <dl className="grid grid-cols-[7rem_1fr] gap-y-1">
             {intent.kind === "create_promise" && (
               <>
