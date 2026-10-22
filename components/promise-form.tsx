@@ -245,7 +245,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
 
   return (
     <Card>
-      <CardHeader className="gap-3">
+      <CardHeader className="gap-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-xl font-semibold tracking-tight">Make a promise</h2>
@@ -257,7 +257,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
         </div>
       </CardHeader>
       <CardContent>
-        <form className="flex flex-col gap-4" onSubmit={submit} noValidate>
+        <form className="flex flex-col gap-3" onSubmit={submit} noValidate>
           {exampleNote && (
             <p className="text-sm text-muted-foreground">
               The example only fills this form. It uses public commits on vercel/next.js. Nothing is saved until you make the promise.
@@ -271,13 +271,13 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
               onBlur={blur("description")}
               aria-invalid={Boolean(show("description"))}
               required
-              rows={3}
+              rows={2}
               placeholder="Ship one commit to my repo"
-              className={`${controlClass} min-h-24`}
+              className={`${controlClass} min-h-16`}
             />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Deadline" error={show("deadline")}>
               <Input type="datetime-local" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} onBlur={blur("deadline")} aria-invalid={Boolean(show("deadline"))} required className="h-11 text-base md:text-base" />
             </Field>
@@ -323,7 +323,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
           </Field>
 
           {form.proofType === "github_commits" && (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Repository" hint="A public GitHub repo, like vercel/next.js." error={show("repo")}>
                 <Input value={form.repo} onChange={(event) => set("repo", event.target.value)} onBlur={blur("repo")} aria-invalid={Boolean(show("repo"))} placeholder="vercel/next.js" required className="h-11 text-base md:text-base" />
               </Field>
@@ -337,7 +337,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
           )}
 
           {form.proofType === "image" && (
-            <div className="flex flex-col gap-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field label="What should the photo show?" hint="Be specific, like a 5k run on a fitness app screenshot." error={show("claim")}>
                 <textarea
                   value={form.claim}
@@ -345,9 +345,9 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
                   onBlur={blur("claim")}
                   aria-invalid={Boolean(show("claim"))}
                   required
-                  rows={3}
+                  rows={2}
                   placeholder="A race bib from a 5k"
-                  className={`${controlClass} min-h-24`}
+                  className={`${controlClass} min-h-16`}
                 />
               </Field>
               <Field label="Photo" hint="JPEG, PNG, WebP, or GIF. Large photos are shrunk before upload. You can add it later.">
@@ -370,6 +370,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
             </div>
           )}
 
+          <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Who gets the money if you miss it?" hint="A friend, a rival, a cause. Picking someone you'd hate to pay works best." error={show("beneficiaryName")}>
             <Input value={form.beneficiaryName} onChange={(event) => set("beneficiaryName", event.target.value)} onBlur={blur("beneficiaryName")} aria-invalid={Boolean(show("beneficiaryName"))} placeholder="A friend" required className="h-11 text-base md:text-base" />
           </Field>
@@ -379,6 +380,8 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
               <Input value={form.beneficiaryAddress} onChange={(event) => set("beneficiaryAddress", event.target.value)} onBlur={blur("beneficiaryAddress")} aria-invalid={Boolean(show("beneficiaryAddress"))} placeholder="0x…" required className="h-11 font-mono text-base md:text-base" />
             </Field>
           )}
+
+          </div>
 
           {walletAvailable && (
             <div className="flex flex-wrap items-center gap-3 text-sm">

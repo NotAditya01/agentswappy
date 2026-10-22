@@ -5,8 +5,20 @@ import { PromiseCard } from "@/components/promise-card";
 import { PromiseForm } from "@/components/promise-form";
 import { AskSwappy } from "@/components/ask-swappy";
 import type { PromisePrefill } from "@/lib/intent";
+import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/wallet-button";
 import type { PromiseRecord } from "@/lib/types";
+
+type Tab = "promises" | "make" | "ask";
+const TABS: [Tab, string][] = [
+  ["promises", "Promises"],
+  ["make", "Make a promise"],
+  ["ask", "Ask Swappy"],
+];
+
+function isSettled(p: PromiseRecord) {
+  return p.verdict === "kept" || p.verdict === "broken" || p.chain?.status === "expired";
+}
 
 type Meta = {
   hasApiKey: boolean;
@@ -30,13 +42,39 @@ export function Dashboard() {
     if (!res.ok) throw new Error(data.error || "Could not load promises.");
     setPromises(data.promises ?? []);
     setMeta(data.meta ?? null);
+    return (data.promises ?? []) as PromiseRecord[];
   }
 
+  const [tab, setTab] = useState<Tab | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "open" | "settled">("all");
+  const [limit, setLimit] = useState(5);
+
   useEffect(() => {
+    const fromHash = () => {
+      const h = window.location.hash.slice(1) as Tab;
+      if (TABS.some(([id]) => id === h)) setTab(h);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
     refresh()
-      .catch(() => setError("Could not load promises."))
+      .then((list) => setTab((t) => t ?? (list.length ? "promises" : "make")))
+      .catch(() => {
+        setError("Could not load promises.");
+        setTab((t) => t ?? "make");
+      })
       .finally(() => setLoading(false));
+    return () => window.removeEventListener("hashchange", fromHash);
   }, []);
+
+  async function reload() {
+    await refresh();
+  }
+
+  function go(next: Tab) {
+    setTab(next);
+    history.replaceState(null, "", `#${next}`);
+  }
 
   function retry() {
     setError(null);
@@ -50,12 +88,14 @@ export function Dashboard() {
 
   function fillForm(value: PromisePrefill) {
     setPrefill({ value, key: Date.now() });
-    setTimeout(() => document.getElementById("promise-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    go("make");
   }
 
   async function onCreated() {
-    await refresh();
-    document.getElementById("promises")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const list = await refresh();
+    setFilter("all");
+    setOpenId(list[0]?.id ?? null);
+    go("promises");
   }
 
   async function check(id: string) {
@@ -74,42 +114,46 @@ export function Dashboard() {
     setCheckingId(null);
   }
 
+  const filtered = promises.filter((p) => (filter === "all" ? true : filter === "settled" ? isSettled(p) : !isSettled(p)));
+  const shown = filtered.slice(0, limit);
+
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-4 py-6 sm:py-10">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-4 sm:py-6">
       <nav className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="" width={32} height={32} className="size-8" />
-          <span className="font-semibold">Swappy</span>
+          <img src="/logo.png" alt="" width={28} height={28} className="size-7" />
+          <span className="font-semibold">Proof of Promise</span>
         </div>
         <WalletButton />
       </nav>
 
-      <header className="flex flex-col gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Proof of Promise</h1>
-        <p className="text-lg">
-          Put a little USDC behind a promise. Swappy checks your proof and sends the money back to you, or to a friend if you miss it.
+      <header className="flex flex-col gap-3">
+        <p className="text-lg leading-snug">
+          Put test USDC behind a promise. Swappy checks the proof, then you get it back, or your friend does.
         </p>
-        <ol className="grid gap-3 sm:grid-cols-3">
-          {[
-            ["1. Promise", "Say what you will do, by when, and how much you put on it."],
-            ["2. Prove", "Swappy checks your GitHub commits or a photo you upload."],
-            ["3. Settle", "Kept: you get it back. Broken: it goes to your friend."],
-          ].map(([title, text]) => (
-            <li key={title} className="border bg-card px-4 py-3">
-              <p className="font-medium text-primary">{title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{text}</p>
-            </li>
-          ))}
+        <ol className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <li><span className="text-primary">1</span> Promise</li>
+          <li><span className="text-primary">2</span> Prove with GitHub or a photo</li>
+          <li><span className="text-primary">3</span> Kept: refund. Broken: friend gets it</li>
         </ol>
-        <p className="text-sm text-muted-foreground">
-          {meta?.settlement === "escrow"
-            ? "Runs on Base Sepolia testnet with test USDC. No wallet? You can still try it, the money part is just simulated."
-            : "Money is simulated here. Nothing real moves."}
-        </p>
-        <a href="#promise-form" className="inline-flex h-11 w-full items-center justify-center bg-primary px-5 font-medium text-primary-foreground sm:w-fit">
-          Make your first promise
-        </a>
+        {meta?.settlement !== "escrow" && <p className="text-sm text-muted-foreground">Money is simulated here.</p>}
       </header>
+
+      <div role="tablist" aria-label="Sections" className="grid grid-cols-3 border">
+        {TABS.map(([id, name]) => (
+          <button
+            key={id}
+            role="tab"
+            type="button"
+            aria-selected={tab === id}
+            onClick={() => go(id)}
+            className={`h-11 px-2 text-sm ${tab === id ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            {name}
+            {id === "promises" && !loading && promises.length > 0 ? ` (${promises.length})` : ""}
+          </button>
+        ))}
+      </div>
 
       {!loading && meta && !meta.hasApiKey && (
         <p role="status" className="border px-4 py-3 text-sm">
@@ -123,41 +167,68 @@ export function Dashboard() {
         </div>
       )}
 
-      <AskSwappy onPrefill={fillForm} onChanged={refresh} />
+      {tab === "ask" && <AskSwappy onPrefill={fillForm} onChanged={reload} />}
 
-      <div id="promise-form" className="scroll-mt-6">
-        <PromiseForm onCreated={onCreated} prefill={prefill} />
-      </div>
+      {tab === "make" && <PromiseForm onCreated={onCreated} prefill={prefill} />}
 
-      <section id="promises" className="flex flex-col gap-4 scroll-mt-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">Promises</h2>
-          {!loading && promises.length > 0 && <span className="text-sm text-muted-foreground">{promises.length} total</span>}
-        </div>
-        {loading && (
-          <div aria-busy="true" aria-label="Loading promises" className="flex flex-col gap-4">
-            {[0, 1].map((i) => (
-              <div key={i} className="h-40 animate-pulse border bg-card" />
+      {tab === "promises" && (
+        <section className="flex flex-col gap-3">
+          {!loading && promises.length > 0 && (
+            <div className="flex gap-1 text-sm">
+              {(["all", "open", "settled"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  aria-pressed={filter === f}
+                  onClick={() => {
+                    setFilter(f);
+                    setLimit(5);
+                  }}
+                  className={`h-9 border px-3 capitalize ${filter === f ? "border-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          )}
+          {loading && (
+            <div aria-busy="true" aria-label="Loading promises" className="flex flex-col gap-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-12 animate-pulse border bg-card" />
+              ))}
+            </div>
+          )}
+          {!loading && !error && filtered.length === 0 && (
+            <div className="border px-4 py-5">
+              <p className="font-medium">{promises.length === 0 ? "No promises yet" : `No ${filter} promises`}</p>
+              {promises.length === 0 && (
+                <button type="button" onClick={() => go("make")} className="mt-2 text-sm text-primary underline underline-offset-4">
+                  Make your first promise
+                </button>
+              )}
+            </div>
+          )}
+          <div className="flex flex-col gap-2">
+            {shown.map((promise) => (
+              <PromiseCard
+                key={promise.id}
+                promise={promise}
+                open={openId === promise.id}
+                onToggle={() => setOpenId((id) => (id === promise.id ? null : promise.id))}
+                checking={checkingId === promise.id}
+                error={checkError?.id === promise.id ? checkError.message : undefined}
+                onCheck={check}
+                onUploaded={reload}
+              />
             ))}
           </div>
-        )}
-        {!loading && !error && promises.length === 0 && (
-          <div className="border px-4 py-6">
-            <p className="font-medium">No promises yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">Make one above and it shows up here, ready to check.</p>
-          </div>
-        )}
-        {promises.map((promise) => (
-          <PromiseCard
-            key={promise.id}
-            promise={promise}
-            checking={checkingId === promise.id}
-            error={checkError?.id === promise.id ? checkError.message : undefined}
-            onCheck={check}
-            onUploaded={refresh}
-          />
-        ))}
-      </section>
+          {filtered.length > limit && (
+            <Button variant="outline" className="h-10" onClick={() => setLimit((n) => n + 5)}>
+              Show more ({filtered.length - limit})
+            </Button>
+          )}
+        </section>
+      )}
     </main>
   );
 }

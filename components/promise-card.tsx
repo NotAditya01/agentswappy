@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
 import { txUrl } from "@/lib/escrow";
 import { backWithX402, expireOnchain } from "@/lib/fund";
@@ -69,12 +69,16 @@ function factsOf(result: unknown): { label: string; value: string }[] {
 
 export function PromiseCard({
   promise,
+  open,
+  onToggle,
   checking,
   error,
   onCheck,
   onUploaded,
 }: {
   promise: PromiseRecord;
+  open: boolean;
+  onToggle: () => void;
   checking: boolean;
   error?: string;
   onCheck: (id: string) => void;
@@ -158,16 +162,22 @@ export function PromiseCard({
   }
 
   return (
-    <Card className="min-w-0" aria-busy={checking}>
-      <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className={STATUS_STYLE[label]}>{label}</Badge>
-          <Badge variant="outline">{PROOF_LABEL[promise.proofType]} proof</Badge>
-          <span className="ml-auto text-sm text-muted-foreground">{countdown(promise.deadline, now)}</span>
-        </div>
-        <h3 className="text-base font-medium leading-snug break-words">{promise.description}</h3>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <Card className="min-w-0 gap-0 py-0" aria-busy={checking}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
+      >
+        <span className="min-w-0 flex-1 truncate font-medium">{promise.description}</span>
+        <Badge variant="outline" className={STATUS_STYLE[label]}>{label}</Badge>
+        <span className="hidden w-28 text-right text-sm text-muted-foreground sm:inline">{countdown(promise.deadline, now)}</span>
+        <span className="w-20 text-right text-sm tabular-nums">{formatUsdc(String(Number(stake) + backed))} USDC</span>
+        <span aria-hidden className="text-muted-foreground">{open ? "−" : "+"}</span>
+      </button>
+      {open && (
+      <CardContent className="flex flex-col gap-4 border-t px-4 py-4">
+        <p className="text-sm text-muted-foreground">{PROOF_LABEL[promise.proofType]} proof · {countdown(promise.deadline, now)}</p>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <Meta label="On the line" value={`${formatUsdc(stake)} USDC${backed > 0 ? ` + ${formatUsdc(String(backed))} from backers` : ""}${chainState || promise.onchain ? "" : " (simulated)"}`} />
           <Meta label="Deadline" value={`${formatWhen(promise.deadline)} · ${dueLabel(promise.deadline)}`} />
@@ -217,7 +227,7 @@ export function PromiseCard({
           <img
             src={`/api/promises/${promise.id}/proof?v=${encodeURIComponent(promise.imageProof.uploadedAt)}`}
             alt={promise.imageProof.fileName}
-            className="max-h-64 w-full border object-contain"
+            className="max-h-48 w-full border object-contain"
           />
         )}
 
@@ -287,6 +297,7 @@ export function PromiseCard({
 
         {promise.trace.length > 0 && <AgentRun steps={promise.trace} />}
       </CardContent>
+      )}
     </Card>
   );
 }
@@ -371,7 +382,7 @@ function TraceJson({ label, value }: { label: string; value: unknown }) {
   return (
     <div className="min-w-0">
       <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-      <pre className="max-h-48 overflow-auto bg-background p-2 text-xs whitespace-pre-wrap break-words">{JSON.stringify(value, null, 2)}</pre>
+      <pre className="overflow-x-auto bg-background p-2 text-xs whitespace-pre-wrap break-words">{JSON.stringify(value, null, 2)}</pre>
     </div>
   );
 }
