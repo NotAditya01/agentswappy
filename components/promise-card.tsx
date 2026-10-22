@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PROOF_LABEL, VERDICT_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
+import { STATUS_STYLE, countdown, statusOf } from "@/lib/status";
+import { PROOF_LABEL, dueLabel, formatUsdc, formatWhen } from "@/lib/format";
 import { txUrl } from "@/lib/escrow";
 import { backWithX402, expireOnchain } from "@/lib/fund";
 import { Input } from "@/components/ui/input";
@@ -21,29 +22,6 @@ const TOOL_LABEL: Record<string, string> = {
   record_verdict: "Wrote the verdict",
   settle_stake: "Settled the stake",
 };
-
-const STATUS_STYLE: Record<string, string> = {
-  Kept: "bg-primary text-primary-foreground",
-  Broken: "bg-destructive/20 text-destructive",
-  Expired: "bg-secondary text-secondary-foreground",
-  Checking: "bg-blue-soft/20 text-blue-soft",
-  "Not yet": "border-border text-foreground",
-  "Check proof": "bg-amber-400/15 text-amber-300 border-amber-400/50",
-  Overdue: "bg-amber-400/25 text-amber-200 border-amber-400",
-  Open: "border-primary/60 text-primary",
-};
-
-function countdown(iso: string, now: number): string {
-  const diff = new Date(iso).getTime() - now;
-  if (Number.isNaN(diff)) return "";
-  const past = diff < 0;
-  const mins = Math.floor(Math.abs(diff) / 60_000);
-  const d = Math.floor(mins / 1440);
-  const h = Math.floor((mins % 1440) / 60);
-  const m = mins % 60;
-  const parts = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${Math.max(m, 1)}m`;
-  return past ? `ended ${parts} ago` : `${parts} left`;
-}
 
 function summaryOf(result: unknown): string | null {
   if (!result || typeof result !== "object") return null;
@@ -98,16 +76,7 @@ export function PromiseCard({
   const chainState = promise.chain;
   const expired = chainState?.status === "expired";
   const settled = promise.verdict === "kept" || promise.verdict === "broken" || expired;
-  const ended = now > new Date(promise.deadline).getTime();
-  const label = expired
-    ? "Expired"
-    : checking
-      ? "Checking"
-      : promise.verdict === "kept" || promise.verdict === "broken"
-        ? VERDICT_LABEL[promise.verdict]
-        : ended
-          ? promise.verdict === "pending" ? "Overdue" : "Check proof"
-          : promise.verdict ? VERDICT_LABEL[promise.verdict] : "Open";
+  const label = statusOf(promise, now, checking);
   const [copied, setCopied] = useState(false);
 
   async function share() {
@@ -188,7 +157,8 @@ export function PromiseCard({
   }
 
   return (
-    <Card className="min-w-0 gap-0 py-0" aria-busy={checking}>
+    <Card className="min-w-0 gap-0 rounded-3xl py-0" aria-busy={checking}>
+      {!standalone && (
       <div className="flex min-w-0 items-stretch">
       <button
         type="button"
@@ -208,8 +178,9 @@ export function PromiseCard({
         </button>
       )}
       </div>
+      )}
       {open && (
-      <CardContent className="flex flex-col gap-4 border-t px-4 py-4">
+      <CardContent className={`flex flex-col gap-4 px-5 py-5 ${standalone ? "" : "border-t"}`}>
         <p className="text-sm text-muted-foreground">{PROOF_LABEL[promise.proofType]} proof · {countdown(promise.deadline, now)}</p>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <Meta label="On the line" value={`${formatUsdc(stake)} USDC${backed > 0 ? ` + ${formatUsdc(String(backed))} from backers` : ""}${chainState || promise.onchain ? "" : " (simulated)"}`} />
@@ -224,7 +195,7 @@ export function PromiseCard({
         ))}
 
         {canBack && (
-          <div className="flex flex-col gap-2">
+          <div id="back" className="flex scroll-mt-6 flex-col gap-2 rounded-2xl border-2 border-warm/40 bg-warm/5 p-4">
             <p className="text-sm font-medium">Back this promise</p>
             <p className="text-sm text-muted-foreground">Add test USDC to cheer them on. You sign once and pay no gas. If they keep it you get it back, if not it goes to {promise.beneficiaryName}.</p>
             <div className="flex flex-wrap gap-2">
@@ -235,7 +206,7 @@ export function PromiseCard({
                 onChange={(e) => setBackAmount(e.target.value)}
                 className="h-11 w-28"
               />
-              <Button type="button" variant="outline" disabled={Boolean(backStep)} onClick={back} className="h-11">
+              <Button type="button" variant="warm" disabled={Boolean(backStep)} onClick={back} className="h-11 px-5">
                 {backStep ? "Backing…" : "Back with USDC"}
               </Button>
             </div>
