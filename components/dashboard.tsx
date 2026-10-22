@@ -1,34 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PromiseCard } from "@/components/promise-card";
 import { PromiseForm } from "@/components/promise-form";
+import { PromiseList } from "@/components/promise-list";
 import { AskSwappy } from "@/components/ask-swappy";
-import type { PromisePrefill } from "@/lib/intent";
+import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
-import { WalletButton } from "@/components/wallet-button";
-import type { PromiseRecord } from "@/lib/types";
-import type { Stats } from "@/lib/stats";
 import { formatUsdc } from "@/lib/format";
+import type { PromisePrefill } from "@/lib/intent";
+import type { Stats } from "@/lib/stats";
+import type { PromiseRecord } from "@/lib/types";
 
-type Tab = "promises" | "make" | "ask";
-const TABS: [Tab, string][] = [
-  ["promises", "Promises"],
-  ["make", "Make a promise"],
-  ["ask", "Ask Swappy"],
-];
+type Meta = { hasApiKey: boolean; settlement: "mock" | "escrow" };
+type Filter = "all" | "open" | "settled";
 
 function isSettled(p: PromiseRecord) {
   return p.verdict === "kept" || p.verdict === "broken" || p.chain?.status === "expired";
 }
-
-type Meta = {
-  hasApiKey: boolean;
-  model: string;
-  hasGithubToken: boolean;
-  settlement: "mock" | "escrow";
-  network: "base-sepolia";
-};
 
 export function Dashboard() {
   const [promises, setPromises] = useState<PromiseRecord[]>([]);
@@ -36,8 +24,11 @@ export function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [checkingId, setCheckingId] = useState<string | null>(null);
-  const [checkError, setCheckError] = useState<{ id: string; message: string } | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [limit, setLimit] = useState(10);
+  const [now, setNow] = useState(() => Date.now());
+  const [prefill, setPrefill] = useState<{ value: PromisePrefill; key: number } | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/promises");
@@ -46,219 +37,148 @@ export function Dashboard() {
     setPromises(data.promises ?? []);
     setMeta(data.meta ?? null);
     setStats(data.stats ?? null);
-    return (data.promises ?? []) as PromiseRecord[];
   }
 
-  const [tab, setTab] = useState<Tab | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "open" | "settled">("all");
-  const [limit, setLimit] = useState(5);
-
-  useEffect(() => {
-    const fromHash = () => {
-      const h = window.location.hash.slice(1) as Tab;
-      if (TABS.some(([id]) => id === h)) setTab(h);
-    };
-    fromHash();
-    window.addEventListener("hashchange", fromHash);
-    refresh()
-      .then((list) => setTab((t) => t ?? (list.length ? "promises" : "make")))
-      .catch(() => {
-        setError("Could not load promises.");
-        setTab((t) => t ?? "make");
-      })
-      .finally(() => setLoading(false));
-    return () => window.removeEventListener("hashchange", fromHash);
-  }, []);
-
-  async function reload() {
-    await refresh();
-  }
-
-  function go(next: Tab) {
-    setTab(next);
-    history.replaceState(null, "", `#${next}`);
-  }
-
-  function retry() {
+  function load() {
     setError(null);
     setLoading(true);
     refresh()
-      .catch(() => setError("Could not load promises. Check your connection."))
+      .catch(() => setError("Could not load promises."))
       .finally(() => setLoading(false));
   }
 
-  const [prefill, setPrefill] = useState<{ value: PromisePrefill; key: number } | null>(null);
+  useEffect(() => {
+    load();
+    if (window.location.hash === "#new") setCreating(true);
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!creating) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setCreating(false);
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [creating]);
 
   function fillForm(value: PromisePrefill) {
     setPrefill({ value, key: Date.now() });
-    go("make");
+    setCreating(true);
   }
 
   async function onCreated() {
-    const list = await refresh();
+    setCreating(false);
+    await refresh();
     setFilter("all");
-    setOpenId(list[0]?.id ?? null);
-    go("promises");
-  }
-
-  async function check(id: string) {
-    setCheckingId(id);
-    setCheckError(null);
-    setError(null);
-    try {
-      const res = await fetch(`/api/promises/${id}/check`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "The check failed.");
-      await refresh();
-    } catch (err) {
-      setCheckError({ id, message: err instanceof Error ? err.message : String(err) });
-      await refresh().catch(() => undefined);
-    }
-    setCheckingId(null);
   }
 
   const filtered = promises.filter((p) => (filter === "all" ? true : filter === "settled" ? isSettled(p) : !isSettled(p)));
   const shown = filtered.slice(0, limit);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-4 sm:py-6">
-      <nav className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="" width={28} height={28} className="size-7" />
-          <span className="font-semibold">Proof of Promise</span>
-        </div>
-        <WalletButton />
-      </nav>
+    <div className="mx-auto flex w-full max-w-[1100px] flex-col px-4 sm:px-6">
+      <SiteHeader />
 
-      <header className="flex flex-col gap-3">
-        <p className="text-lg leading-snug">
-          Put test USDC behind a promise. Swappy checks the proof, then you get it back, or your friend does.
+      <section className="flex flex-col gap-4 pt-16 pb-12 sm:pt-24">
+        <h1 className="max-w-2xl text-3xl font-semibold tracking-[-0.03em] sm:text-5xl">Put money on your promises.</h1>
+        <p className="max-w-xl text-base text-muted-foreground">
+          Stake test USDC on a goal. An agent checks the proof at the deadline and refunds you, or pays the friend you named.
         </p>
-        <ol className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <li><span className="text-primary">1</span> Promise</li>
-          <li><span className="text-primary">2</span> Prove with GitHub or a photo</li>
-          <li><span className="text-primary">3</span> Kept: refund. Broken: friend gets it</li>
-        </ol>
-        {meta?.settlement !== "escrow" && <p className="text-sm text-muted-foreground">Money is simulated here.</p>}
-      </header>
+        <div className="flex gap-3 pt-4">
+          <Button onClick={() => setCreating(true)} className="h-9 px-4">New promise</Button>
+          <Button variant="outline" onClick={() => document.getElementById("ask-input")?.focus()} className="h-9 px-4">
+            Ask Swappy <kbd className="ml-2 font-mono text-xs text-muted-foreground">/</kbd>
+          </Button>
+        </div>
+      </section>
 
-      {stats && (
-        <dl className="grid grid-cols-3 border text-center">
-          {[
-            [`${formatUsdc(String(stats.lockedUsdc))}`, "USDC locked now"],
-            [String(stats.kept), "promises kept"],
-            [String(stats.backers), stats.backers === 1 ? "backer" : "backers"],
-          ].map(([value, name]) => (
-            <div key={name} className="border-r px-2 py-2 last:border-r-0">
-              <dt className="sr-only">{name}</dt>
-              <dd className="text-lg font-semibold tabular-nums">{value}</dd>
-              <dd className="text-xs text-muted-foreground">{name}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-
-      <div role="tablist" aria-label="Sections" className="grid grid-cols-3 border">
-        {TABS.map(([id, name]) => (
-          <button
-            key={id}
-            role="tab"
-            type="button"
-            aria-selected={tab === id}
-            onClick={() => go(id)}
-            className={`h-11 px-2 text-sm ${tab === id ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            {id === "make" ? (
-              <>
-                <span className="sm:hidden">New</span>
-                <span className="hidden sm:inline">{name}</span>
-              </>
-            ) : (
-              name
-            )}
-            {id === "promises" && !loading && promises.length > 0 ? ` (${promises.length})` : ""}
-          </button>
+      <dl className="grid grid-cols-3 divide-x rounded-md border">
+        {[
+          ["Locked in open promises", stats ? `${formatUsdc(String(stats.lockedUsdc))}` : "—", "USDC"],
+          ["Promises kept", stats ? String(stats.kept) : "—", ""],
+          ["Backers", stats ? String(stats.backers) : "—", ""],
+        ].map(([name, value, unit]) => (
+          <div key={name} className="flex flex-col gap-1 px-4 py-4 sm:px-6 sm:py-5">
+            <dt className="text-xs text-muted-foreground">{name}</dt>
+            <dd className="font-mono text-xl tracking-tight sm:text-2xl">
+              {value}
+              {unit && <span className="ml-1.5 text-xs text-muted-foreground">{unit}</span>}
+            </dd>
+          </div>
         ))}
-      </div>
+      </dl>
 
-      {!loading && meta && !meta.hasApiKey && (
-        <p role="status" className="border px-4 py-3 text-sm">
-          Proof checks are switched off right now because Swappy has no AI key. Nothing gets settled on a guess.
-        </p>
-      )}
-      {error && (
-        <div role="alert" className="flex flex-wrap items-center gap-3 border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <span>{error}</span>
-          <button type="button" onClick={retry} className="underline underline-offset-4">Try again</button>
-        </div>
-      )}
+      <section className="pt-12">
+        <AskSwappy onPrefill={fillForm} onChanged={refresh} />
+      </section>
 
-      {tab === "ask" && <AskSwappy onPrefill={fillForm} onChanged={reload} />}
-
-      {tab === "make" && <PromiseForm onCreated={onCreated} prefill={prefill} />}
-
-      {tab === "promises" && (
-        <section className="flex flex-col gap-3">
-          {!loading && promises.length > 0 && (
-            <div className="flex gap-1 text-sm">
-              {(["all", "open", "settled"] as const).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  aria-pressed={filter === f}
-                  onClick={() => {
-                    setFilter(f);
-                    setLimit(5);
-                  }}
-                  className={`h-9 border px-3 capitalize ${filter === f ? "border-primary text-primary" : "text-muted-foreground hover:text-foreground"}`}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-          )}
-          {loading && (
-            <div aria-busy="true" aria-label="Loading promises" className="flex flex-col gap-2">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="h-12 animate-pulse border bg-card" />
-              ))}
-            </div>
-          )}
-          {!loading && !error && filtered.length === 0 && (
-            <div className="flex items-center gap-4 border px-4 py-5">
-              {promises.length === 0 && <img src="/logo.png" alt="" width={72} height={72} className="size-18 shrink-0" />}
-              <div>
-              <p className="font-medium">{promises.length === 0 ? "No promises yet" : `No ${filter} promises`}</p>
-              {promises.length === 0 && (
-                <button type="button" onClick={() => go("make")} className="mt-2 text-sm text-primary underline underline-offset-4">
-                  Make your first promise
-                </button>
-              )}
-              </div>
-            </div>
-          )}
-          <div className="flex flex-col gap-2">
-            {shown.map((promise) => (
-              <PromiseCard
-                key={promise.id}
-                promise={promise}
-                open={openId === promise.id}
-                onToggle={() => setOpenId((id) => (id === promise.id ? null : promise.id))}
-                checking={checkingId === promise.id}
-                error={checkError?.id === promise.id ? checkError.message : undefined}
-                onCheck={check}
-                onUploaded={reload}
-              />
+      <section className="flex flex-col gap-4 pt-12 pb-24">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-medium">Promises</h2>
+          <div className="flex gap-1 text-sm" role="group" aria-label="Filter">
+            {(["all", "open", "settled"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={filter === f}
+                onClick={() => {
+                  setFilter(f);
+                  setLimit(10);
+                }}
+                className={`h-7 rounded-md px-2.5 capitalize transition-colors duration-150 ${filter === f ? "bg-white/[0.08] text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {f}
+              </button>
             ))}
           </div>
-          {filtered.length > limit && (
-            <Button variant="outline" className="h-10" onClick={() => setLimit((n) => n + 5)}>
-              Show more ({filtered.length - limit})
-            </Button>
-          )}
-        </section>
+        </div>
+
+        {meta && !meta.hasApiKey && <p role="status" className="text-sm text-muted-foreground">Proof checks are off: no AI key is configured.</p>}
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}{" "}
+            <button type="button" onClick={load} className="underline underline-offset-4">Retry</button>
+          </p>
+        )}
+        {loading && <div aria-busy="true" className="h-24 rounded-md border" />}
+        {!loading && !error && filtered.length === 0 && (
+          <p className="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">
+            {promises.length === 0 ? "No promises yet." : `No ${filter} promises.`}
+          </p>
+        )}
+        {!loading && shown.length > 0 && <PromiseList promises={shown} now={now} />}
+        {filtered.length > limit && (
+          <Button variant="outline" onClick={() => setLimit((n) => n + 10)} className="h-8 self-start">
+            Show {Math.min(10, filtered.length - limit)} more
+          </Button>
+        )}
+      </section>
+
+      <footer className="flex justify-between border-t py-6 font-mono text-xs text-muted-foreground">
+        <span>Base Sepolia · test USDC only</span>
+        <a href="https://github.com/NotAditya01/agentswappy" target="_blank" rel="noreferrer" className="transition-colors duration-150 hover:text-foreground">Source</a>
+      </footer>
+
+      {creating && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 sm:items-start sm:p-6 sm:pt-[10vh]" onClick={() => setCreating(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="New promise"
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-h-[90dvh] w-full max-w-xl overflow-y-auto rounded-t-lg border bg-popover p-6 sm:rounded-lg"
+          >
+            <button type="button" onClick={() => setCreating(false)} aria-label="Close" className="absolute top-5 right-5 font-mono text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground">
+              Esc
+            </button>
+            <PromiseForm onCreated={onCreated} prefill={prefill} />
+          </div>
+        </div>
       )}
-    </main>
+    </div>
   );
 }

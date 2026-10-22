@@ -1,9 +1,8 @@
 "use client";
 
 import { walletErrorMessage } from "@/lib/wallet-error";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { controlClass } from "@/components/field";
 import { useWallet } from "@/components/wallet-provider";
 import { txUrl } from "@/lib/escrow";
 import { formatUsdc } from "@/lib/format";
@@ -12,8 +11,8 @@ import type { Intent, PromisePrefill } from "@/lib/intent";
 import type { Sender } from "@/lib/transfer";
 
 const EXAMPLES = [
-  "I promise to push 3 commits to owner/repo by Friday, stake 1 USDC, else pay 0x…",
-  "back <promise title> with 2 USDC",
+  "promise 3 commits to owner/repo by Friday, 1 USDC",
+  "back <title> with 2 USDC",
   "send 1 USDC to 0x…",
 ];
 
@@ -35,6 +34,17 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: PromisePrefill) => void; onChanged: () => Promise<void> }) {
   const { installed, account, connect, refreshBalance } = useWallet();
   const [prompt, setPrompt] = useState("");
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.key !== "/" || t.closest("input, textarea, [contenteditable]")) return;
+      e.preventDefault();
+      document.getElementById("ask-input")?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [reply, setReply] = useState<Reply | null>(null);
   const [sender, setSender] = useState<Sender>("agent");
   const [busy, setBusy] = useState<string | null>(null);
@@ -124,34 +134,30 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
     intent?.kind === "send" && sender === "agent" && Number(intent.transfer.amount) > Number(reply?.agentCap[intent.transfer.token]);
 
   return (
-    <section className="flex flex-col gap-3 border px-4 py-5">
-      <div className="flex items-center gap-4">
-        <img src="/logo.png" alt="" width={64} height={64} className="size-16 shrink-0" />
-        <div>
-        <h2 className="text-xl font-semibold tracking-tight">Ask Swappy</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Prefer typing? Tell Swappy what you want in plain words. Nothing happens until you confirm.</p>
-        </div>
-      </div>
-      <form onSubmit={ask} className="flex flex-col gap-2 sm:flex-row">
+    <section className="flex flex-col gap-3">
+      <form onSubmit={ask} className="flex h-12 items-center gap-3 rounded-md border bg-popover px-3 transition-colors duration-150 focus-within:border-white/25">
+        <img src="/logo.png" alt="" width={20} height={20} className="size-5 rounded-[4px]" />
         <input
-          className={controlClass}
+          id="ask-input"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          aria-label="Ask Swappy"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Tell Swappy what to do"
+          placeholder="Ask Swappy to create, back or send…"
           disabled={Boolean(busy)}
         />
-        <Button type="submit" size="lg" disabled={Boolean(busy) || !prompt.trim()}>
-          Ask
-        </Button>
+        {prompt.trim() ? (
+          <button type="submit" disabled={Boolean(busy)} className="font-mono text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground">
+            Enter ↵
+          </button>
+        ) : (
+          <kbd className="hidden rounded border px-1.5 font-mono text-xs text-muted-foreground sm:inline">/</kbd>
+        )}
       </form>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span>Try</span>
         {EXAMPLES.map((example) => (
-          <button
-            key={example}
-            type="button"
-            className="border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setPrompt(example)}
-          >
+          <button key={example} type="button" className="font-mono transition-colors duration-150 hover:text-foreground" onClick={() => setPrompt(example)}>
             {example}
           </button>
         ))}
@@ -160,7 +166,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
       {intent?.kind === "clarify" && <p className="text-sm">{intent.question}</p>}
 
       {intent && intent.kind !== "clarify" && (
-        <div className="flex flex-col gap-3 border px-4 py-4 text-sm">
+        <div className="flex flex-col gap-4 rounded-md border bg-popover px-4 py-4 text-sm">
           <dl className="grid grid-cols-[7rem_1fr] gap-y-1">
             {intent.kind === "create_promise" && (
               <>
@@ -225,7 +231,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
         <p className="text-sm">
           {done.text}{" "}
           {done.hash && (
-            <a className="break-all underline" href={txUrl(done.hash)} target="_blank" rel="noreferrer">
+            <a className="break-all font-mono text-xs underline underline-offset-4" href={txUrl(done.hash)} target="_blank" rel="noreferrer">
               {done.hash}
             </a>
           )}
