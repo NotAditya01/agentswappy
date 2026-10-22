@@ -1,5 +1,7 @@
 import { MODEL } from "@/agent/model";
 import { escrowReady } from "@/agent/wallet";
+import { visible } from "@/lib/hidden";
+import { statsOf } from "@/lib/stats";
 import { withChainState } from "@/lib/chain-state";
 import { createPromise, listPromises, storageKind } from "@/lib/store";
 import { validateCreate } from "@/lib/validate";
@@ -8,9 +10,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const promises = await withChainState(await listPromises());
+  const promises = await withChainState(visible(await listPromises()));
   return Response.json({
     promises,
+    stats: statsOf(promises),
     meta: {
       hasApiKey: Boolean(process.env.GEMINI_API_KEY),
       model: MODEL,
