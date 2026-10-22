@@ -21,7 +21,7 @@ const SIMULATED_PAYOUT = "0x2222222222222222222222222222222222222222";
 const PROOF_HELP: Record<ProofType, string> = {
   github_commits: "We look up public commits on the repository you name, from the start date through the deadline.",
   image: "Upload a photo. The check sends that image to Gemini, and Swappy decides if it shows what you described.",
-  strava: "Strava is not connected yet. A check stays unfinished, and nothing is settled.",
+  strava: "After you create it, connect Strava on the card. Swappy counts matching activities between now and the deadline.",
 };
 
 type FormState = {
@@ -37,6 +37,7 @@ type FormState = {
   claim: string;
   activity: string;
   minDistanceKm: string;
+  minCount: string;
 };
 
 function blankForm(): FormState {
@@ -53,6 +54,7 @@ function blankForm(): FormState {
     claim: "",
     activity: "run",
     minDistanceKm: "",
+    minCount: "",
   };
 }
 
@@ -180,6 +182,7 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
       draft.strava = {
         activity: form.activity,
         ...(form.minDistanceKm.trim() ? { minDistanceKm: Number(form.minDistanceKm) } : {}),
+        ...(form.minCount.trim() ? { minCount: Number(form.minCount) } : {}),
       };
     }
 
@@ -361,6 +364,9 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
               </Field>
               <Field label="Minimum kilometers" hint="Optional.">
                 <Input value={form.minDistanceKm} onChange={(event) => set("minDistanceKm", event.target.value)} inputMode="decimal" className="h-11 text-base md:text-base" />
+              </Field>
+              <Field label="How many times" hint="Optional. Defaults to 1.">
+                <Input value={form.minCount} onChange={(event) => set("minCount", event.target.value)} inputMode="numeric" className="h-11 text-base md:text-base" />
               </Field>
             </div>
           )}

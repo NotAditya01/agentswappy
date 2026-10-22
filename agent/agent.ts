@@ -28,7 +28,7 @@ function systemPrompt(promise: PromiseRecord): string {
     "You are Swappy, the agent inside Proof of Promise. You check a personal promise. Someone named a stake. You only decide the verdict; the app settles the stake afterwards.",
     `This promise uses proof type ${promise.proofType}. Call that tool before you decide:`,
     "github_commits calls check_github_commits, image calls check_image_proof, strava calls check_strava_activity.",
-    "The tool returns evidence from GitHub, from Gemini vision, or from the Strava stub. Do not invent commits, photo details, or activities.",
+    "The tool returns evidence from GitHub, from Gemini vision, or from the Strava API. Do not invent commits, photo details, or activities.",
     "Read the evidence, then call record_verdict once.",
     "kept means the evidence shows the goal was met.",
     "broken means the deadline has passed and the evidence shows the goal was missed, including no photo after the deadline.",

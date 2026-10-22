@@ -60,13 +60,15 @@ export const tools: Tool[] = [
   {
     name: "check_strava_activity",
     description:
-      "Check a Strava activity for this promise. Strava is not connected, so the result says the activity could not be verified. Call this when the proof type is strava.",
+      "Check the promiser's Strava activities between when the promise was made and the deadline. Call this when the proof type is strava.",
     parameters: { type: "object", properties: {} },
     run: async (_args, ctx) => {
       const promise = requirePromise(ctx);
       if (promise.proofType !== "strava") throw new Error("This promise is not checked with Strava.");
       const result = await checkStravaActivity({
         ...(promise.criteria as StravaCriteria),
+        promiseId: promise.id,
+        createdAt: promise.createdAt,
         deadline: promise.deadline,
       });
       ctx.evidenceSeen = true;

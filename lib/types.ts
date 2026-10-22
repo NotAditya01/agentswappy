@@ -21,6 +21,7 @@ export type ImageCriteria = {
 export type StravaCriteria = {
   activity: string;
   minDistanceKm?: number;
+  minCount?: number;
 };
 
 export type PromiseCriteria = GithubCriteria | ImageCriteria | StravaCriteria;
@@ -139,7 +140,7 @@ export type PromiseDraft = {
     since?: string;
   };
   image?: { claim: string };
-  strava?: { activity: string; minDistanceKm?: number };
+  strava?: { activity: string; minDistanceKm?: number; minCount?: number };
   walletStake?: boolean;
 };
 

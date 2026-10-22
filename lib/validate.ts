@@ -124,20 +124,28 @@ export function validateCreate(body: unknown): { ok: true; value: CreatePromiseI
       return { ok: false, error: "Distance must be a positive number of kilometers." };
     }
   }
+  let minCount: number | undefined;
+  if (draft.strava?.minCount != null && String(draft.strava.minCount).trim() !== "") {
+    minCount = Number(draft.strava.minCount);
+    if (!Number.isInteger(minCount) || minCount < 1 || minCount > 100) {
+      return { ok: false, error: "Number of activities must be a whole number from 1 to 100." };
+    }
+  }
   const distance = minDistanceKm ? ` of at least ${minDistanceKm} km` : "";
+  const lead = minCount && minCount > 1 ? `${minCount} times, a` : "A";
   return {
     ok: true,
     value: {
       description,
       deadline: deadlineDate.toISOString(),
       proofType: "strava",
-      target: `A ${activity}${distance} on Strava`,
+      target: `${lead} ${activity}${distance} on Strava`,
       stakeUsdc,
       makerAddress,
       beneficiaryName,
       beneficiaryAddress,
       walletStake: draft.walletStake === true,
-      criteria: { activity, ...(minDistanceKm ? { minDistanceKm } : {}) },
+      criteria: { activity, ...(minDistanceKm ? { minDistanceKm } : {}), ...(minCount && minCount > 1 ? { minCount } : {}) },
     },
   };
 }
