@@ -20,8 +20,7 @@ const SIMULATED_PAYOUT = "0x2222222222222222222222222222222222222222";
 
 const PROOF_HELP: Record<ProofType, string> = {
   github_commits: "We look up public commits on the repository you name, from the start date through the deadline.",
-  image: "Upload a photo. The check sends that image to Gemini, and Swappy decides if it shows what you described.",
-  strava: "After you create it, connect Strava on the card. Swappy counts matching activities between now and the deadline.",
+  image: "Upload a photo or a workout screenshot from any fitness app. Gemini reads it, including distance and date, and Swappy decides if it shows what you described.",
 };
 
 type FormState = {
@@ -35,9 +34,6 @@ type FormState = {
   minCommits: string;
   since: string;
   claim: string;
-  activity: string;
-  minDistanceKm: string;
-  minCount: string;
 };
 
 function blankForm(): FormState {
@@ -52,9 +48,6 @@ function blankForm(): FormState {
     minCommits: "1",
     since: "",
     claim: "",
-    activity: "run",
-    minDistanceKm: "",
-    minCount: "",
   };
 }
 
@@ -176,14 +169,8 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
         minCommits: Number(form.minCommits),
         ...(since ? { since } : {}),
       };
-    } else if (form.proofType === "image") {
-      draft.image = { claim: form.claim };
     } else {
-      draft.strava = {
-        activity: form.activity,
-        ...(form.minDistanceKm.trim() ? { minDistanceKm: Number(form.minDistanceKm) } : {}),
-        ...(form.minCount.trim() ? { minCount: Number(form.minCount) } : {}),
-      };
+      draft.image = { claim: form.claim };
     }
 
     try {
@@ -290,12 +277,11 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
           </div>
 
           <Field label="How will you prove it?" hint={PROOF_HELP[form.proofType]}>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {(
                 [
                   ["github_commits", "GitHub"],
                   ["image", "Photo"],
-                  ["strava", "Strava"],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -353,20 +339,6 @@ export function PromiseForm({ onCreated, prefill }: { onCreated: () => Promise<v
                   }}
                   className={`${controlClass} file:mr-3 file:text-sm`}
                 />
-              </Field>
-            </div>
-          )}
-
-          {form.proofType === "strava" && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Activity">
-                <Input value={form.activity} onChange={(event) => set("activity", event.target.value)} placeholder="run" required className="h-11 text-base md:text-base" />
-              </Field>
-              <Field label="Minimum kilometers" hint="Optional.">
-                <Input value={form.minDistanceKm} onChange={(event) => set("minDistanceKm", event.target.value)} inputMode="decimal" className="h-11 text-base md:text-base" />
-              </Field>
-              <Field label="How many times" hint="Optional. Defaults to 1.">
-                <Input value={form.minCount} onChange={(event) => set("minCount", event.target.value)} inputMode="numeric" className="h-11 text-base md:text-base" />
               </Field>
             </div>
           )}

@@ -12,14 +12,12 @@ import { walletErrorMessage } from "@/lib/wallet-error";
 import { useWallet } from "@/components/wallet-provider";
 import { needsOnchainSettle } from "@/lib/stake";
 import { shrinkPhoto } from "@/lib/shrink";
-import { StravaConnect } from "@/components/strava-connect";
 import type { PromiseRecord, TraceStep, Verdict } from "@/lib/types";
 
 
 const TOOL_LABEL: Record<string, string> = {
   check_github_commits: "Looked up GitHub commits",
   check_image_proof: "Looked at the photo",
-  check_strava_activity: "Checked Strava",
   record_verdict: "Wrote the verdict",
   settle_stake: "Settled the stake",
 };
@@ -51,8 +49,6 @@ function factsOf(result: unknown): { label: string; value: string }[] {
   if (typeof row.commitCount === "number") facts.push({ label: "Commits found", value: String(row.commitCount) });
   if (typeof row.bytesSent === "number") facts.push({ label: "Photo sent", value: `${row.bytesSent} bytes` });
   if (typeof row.observation === "string" && row.observation) facts.push({ label: "What Gemini saw", value: row.observation });
-  if (row.configured === false) facts.push({ label: "Strava", value: "Not configured" });
-  else if (row.connected === false) facts.push({ label: "Strava", value: "Not connected" });
   if (row.sentToVision === false) facts.push({ label: "Photo", value: "Not sent" });
   return facts;
 }
@@ -148,7 +144,7 @@ export function PromiseCard({
   }
 
   return (
-    <Card id={`promise-${promise.id}`} className="min-w-0" aria-busy={checking}>
+    <Card className="min-w-0" aria-busy={checking}>
       <CardHeader className="gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={verdictVariant(promise.verdict)}>{label}</Badge>
@@ -225,8 +221,6 @@ export function PromiseCard({
             {uploadError && <span className="text-destructive">{uploadError}</span>}
           </label>
         )}
-
-        {promise.proofType === "strava" && <StravaConnect promiseId={promise.id} disabled={settled} />}
 
         <div className="flex flex-col gap-3">
           <div>

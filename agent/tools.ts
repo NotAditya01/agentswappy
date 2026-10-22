@@ -1,7 +1,6 @@
-import type { GithubCriteria, PromiseRecord, StravaCriteria, Verdict } from "@/lib/types";
+import type { GithubCriteria, PromiseRecord, Verdict } from "@/lib/types";
 import { checkGithubCommits } from "./proofs/github";
 import { checkImageProof } from "./proofs/image";
-import { checkStravaActivity } from "./proofs/strava";
 
 export type ToolContext = {
   baseUrl: string;
@@ -47,30 +46,12 @@ export const tools: Tool[] = [
   {
     name: "check_image_proof",
     description:
-      "Send this promise's uploaded photo to Gemini vision and return what the model saw. Call this when the proof type is image. It does not settle the stake.",
+      "Send this promise's uploaded photo to Gemini vision and return what the model saw. Works for any photo, including workout screenshots from a fitness app, where it reads distance and date. Call this when the proof type is image. It does not settle the stake.",
     parameters: { type: "object", properties: {} },
     run: async (_args, ctx) => {
       const promise = requirePromise(ctx);
       if (promise.proofType !== "image") throw new Error("This promise is not checked with a photo.");
       const result = await checkImageProof(promise);
-      ctx.evidenceSeen = true;
-      return result;
-    },
-  },
-  {
-    name: "check_strava_activity",
-    description:
-      "Check the promiser's Strava activities between when the promise was made and the deadline. Call this when the proof type is strava.",
-    parameters: { type: "object", properties: {} },
-    run: async (_args, ctx) => {
-      const promise = requirePromise(ctx);
-      if (promise.proofType !== "strava") throw new Error("This promise is not checked with Strava.");
-      const result = await checkStravaActivity({
-        ...(promise.criteria as StravaCriteria),
-        promiseId: promise.id,
-        createdAt: promise.createdAt,
-        deadline: promise.deadline,
-      });
       ctx.evidenceSeen = true;
       return result;
     },

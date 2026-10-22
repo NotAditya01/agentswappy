@@ -1,4 +1,4 @@
-export type ProofType = "github_commits" | "image" | "strava";
+export type ProofType = "github_commits" | "image";
 
 export type Verdict = "kept" | "broken" | "pending";
 
@@ -18,13 +18,7 @@ export type ImageCriteria = {
   claim: string;
 };
 
-export type StravaCriteria = {
-  activity: string;
-  minDistanceKm?: number;
-  minCount?: number;
-};
-
-export type PromiseCriteria = GithubCriteria | ImageCriteria | StravaCriteria;
+export type PromiseCriteria = GithubCriteria | ImageCriteria;
 
 export type TraceStep = {
   tool: string;
@@ -42,7 +36,7 @@ export type ImageProof = {
 };
 
 export type ProofCheckResult = {
-  provider: "github" | "image" | "strava";
+  provider: "github" | "image";
   verified: boolean;
   goalMet: boolean;
   missingUserProof: boolean;
@@ -140,7 +134,6 @@ export type PromiseDraft = {
     since?: string;
   };
   image?: { claim: string };
-  strava?: { activity: string; minDistanceKm?: number; minCount?: number };
   walletStake?: boolean;
 };
 

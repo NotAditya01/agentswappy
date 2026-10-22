@@ -3,7 +3,6 @@ import type { ProofType, Verdict } from "./types";
 export const PROOF_LABEL: Record<ProofType, string> = {
   github_commits: "GitHub commits",
   image: "Photo",
-  strava: "Strava",
 };
 
 export const VERDICT_LABEL: Record<Verdict, string> = {

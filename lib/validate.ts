@@ -1,7 +1,7 @@
 import { getAddress, isAddress } from "viem";
 import type { CreatePromiseInput, PromiseDraft, ProofType } from "./types";
 
-const PROOF_TYPES: ProofType[] = ["github_commits", "image", "strava"];
+const PROOF_TYPES: ProofType[] = ["github_commits", "image"];
 const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 const REPO = /^[A-Za-z0-9._-]{1,100}$/;
 
@@ -35,7 +35,7 @@ export function validateCreate(body: unknown): { ok: true; value: CreatePromiseI
   if (Number.isNaN(deadlineDate.getTime())) return { ok: false, error: "Deadline must be a valid date." };
 
   if (!PROOF_TYPES.includes(draft.proofType)) {
-    return { ok: false, error: "Proof type must be github_commits, image, or strava." };
+    return { ok: false, error: "Proof type must be github_commits or image." };
   }
 
   const stakeUsdc = parseStake(draft.stakeUsdc);
@@ -114,38 +114,5 @@ export function validateCreate(body: unknown): { ok: true; value: CreatePromiseI
       },
     };
   }
-
-  const activity = cleanText(draft.strava?.activity, 40);
-  if (activity.length < 2) return { ok: false, error: "Name the Strava activity, such as run or ride." };
-  let minDistanceKm: number | undefined;
-  if (draft.strava?.minDistanceKm != null && String(draft.strava.minDistanceKm).trim() !== "") {
-    minDistanceKm = Number(draft.strava.minDistanceKm);
-    if (!Number.isFinite(minDistanceKm) || minDistanceKm <= 0 || minDistanceKm > 1000) {
-      return { ok: false, error: "Distance must be a positive number of kilometers." };
-    }
-  }
-  let minCount: number | undefined;
-  if (draft.strava?.minCount != null && String(draft.strava.minCount).trim() !== "") {
-    minCount = Number(draft.strava.minCount);
-    if (!Number.isInteger(minCount) || minCount < 1 || minCount > 100) {
-      return { ok: false, error: "Number of activities must be a whole number from 1 to 100." };
-    }
-  }
-  const distance = minDistanceKm ? ` of at least ${minDistanceKm} km` : "";
-  const lead = minCount && minCount > 1 ? `${minCount} times, a` : "A";
-  return {
-    ok: true,
-    value: {
-      description,
-      deadline: deadlineDate.toISOString(),
-      proofType: "strava",
-      target: `${lead} ${activity}${distance} on Strava`,
-      stakeUsdc,
-      makerAddress,
-      beneficiaryName,
-      beneficiaryAddress,
-      walletStake: draft.walletStake === true,
-      criteria: { activity, ...(minDistanceKm ? { minDistanceKm } : {}), ...(minCount && minCount > 1 ? { minCount } : {}) },
-    },
-  };
+  return { ok: false, error: "Proof type must be github_commits or image." };
 }
