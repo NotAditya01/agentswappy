@@ -136,7 +136,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
   return (
     <section className="flex flex-col gap-3">
       <form onSubmit={ask} className="flex h-12 items-center gap-3 rounded-md border bg-popover px-3 transition-colors duration-150 focus-within:border-white/25">
-        <img src="/logo.png" alt="" width={20} height={20} className="size-5 rounded-[4px]" />
+        <img src="/logo.png" alt="" width={20} height={20} className="size-5 rounded-[4px] ring-1 ring-white/15" />
         <input
           id="ask-input"
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
