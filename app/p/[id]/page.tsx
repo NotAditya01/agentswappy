@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { getPromise } from "@/lib/store";
 import { formatUsdc } from "@/lib/format";
 import { SharedPromise } from "@/components/shared-promise";
@@ -16,5 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const p = await getPromise(id).catch(() => undefined);
+  if (p === null) notFound();
   return <SharedPromise id={id} />;
 }
