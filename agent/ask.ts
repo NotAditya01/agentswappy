@@ -24,9 +24,9 @@ export async function parseAsk(prompt: string, promises: PromiseRecord[]): Promi
   }
 
   const ai = new GoogleGenAI({ apiKey: requireGeminiKey() });
-  const response = await callGemini((abortSignal) =>
+  const response = await callGemini((abortSignal, model) =>
     ai.models.generateContent({
-      model: MODEL,
+      model,
       contents: [{ role: "user", parts: [{ text }] }],
       config: { systemInstruction: systemPrompt(new Date()), abortSignal, temperature: 0, responseMimeType: "application/json" },
     }),

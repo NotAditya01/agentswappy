@@ -70,8 +70,9 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
   try {
     const mimeType = promise.imageProof.mimeType;
     const ai = new GoogleGenAI({ apiKey });
-    const response = await callGemini((abortSignal) => ai.models.generateContent({
-      model: MODEL,
+    let usedModel = MODEL;
+    const response = await callGemini((abortSignal, model) => (usedModel = model, ai.models.generateContent({
+      model,
       contents: [
         {
           role: "user",
@@ -91,7 +92,7 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
         },
       ],
       config: { abortSignal, temperature: 0, responseMimeType: "application/json" },
-    }));
+    })));
 
     const parsed = parseVision(response.text ?? "");
     if (!parsed || parsed.confidence < CONFIDENT) {
@@ -108,7 +109,7 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
           fileName: promise.imageProof.fileName,
           sentToVision: true,
           bytesSent: bytes.length,
-          model: MODEL,
+          model: usedModel,
           observation: parsed?.observation ?? null,
           confidence: parsed?.confidence ?? null,
         },
@@ -137,7 +138,7 @@ export async function checkImageProof(promise: PromiseRecord, now = new Date()):
         fileName: promise.imageProof.fileName,
         sentToVision: true,
         bytesSent: bytes.length,
-        model: MODEL,
+        model: usedModel,
         matches: parsed.matches,
         confidence: parsed.confidence,
         observation: parsed.observation,

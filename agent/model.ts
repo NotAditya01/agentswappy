@@ -1,5 +1,12 @@
 export const MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
 
+// Tried in order. The fallback only runs when the model before it hits its daily quota.
+export function modelChain(env: Record<string, string | undefined> = process.env): string[] {
+  const primary = env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+  const fallback = env.GEMINI_FALLBACK_MODEL?.trim();
+  return fallback && fallback !== primary ? [primary, fallback] : [primary];
+}
+
 export function requireGeminiKey(): string {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) {
@@ -54,7 +61,24 @@ async function attempt<T>(call: (signal: AbortSignal) => Promise<T>, timeoutMs: 
   }
 }
 
-export async function callGemini<T>(call: (signal: AbortSignal) => Promise<T>, deadline?: number): Promise<T> {
+export async function callGemini<T>(
+  call: (signal: AbortSignal, model: string) => Promise<T>,
+  deadline?: number,
+  models: string[] = modelChain(),
+): Promise<T> {
+  for (let i = 0; i < models.length; i++) {
+    try {
+      return await callModel((signal) => call(signal, models[i]), deadline);
+    } catch (err) {
+      const last = i === models.length - 1;
+      if (!last && err instanceof Error && err.message === GEMINI_DAILY_QUOTA) continue;
+      throw err;
+    }
+  }
+  throw new Error(GEMINI_BUSY);
+}
+
+async function callModel<T>(call: (signal: AbortSignal) => Promise<T>, deadline?: number): Promise<T> {
   const budget = () => (deadline ? deadline - Date.now() : Infinity);
 
   for (let tries = 0; ; tries++) {
