@@ -67,9 +67,13 @@ export async function callGemini<T>(
   models: string[] = modelChain(),
 ): Promise<T> {
   for (let i = 0; i < models.length; i++) {
+    const started = Date.now();
     try {
-      return await callModel((signal) => call(signal, models[i]), deadline);
+      const out = await callModel((signal) => call(signal, models[i]), deadline);
+      console.info(`[gemini] ${models[i]} ok in ${Date.now() - started}ms`);
+      return out;
     } catch (err) {
+      console.warn(`[gemini] ${models[i]} failed after ${Date.now() - started}ms: ${geminiFailure("", err).message.slice(0, 240)}`);
       const last = i === models.length - 1;
       if (!last && err instanceof Error && err.message === GEMINI_DAILY_QUOTA) continue;
       throw err;
@@ -87,6 +91,7 @@ async function callModel<T>(call: (signal: AbortSignal) => Promise<T>, deadline?
     try {
       return await attempt(call, timeoutMs);
     } catch (err) {
+      if (tries === 0) console.warn(`[gemini] attempt failed: ${geminiFailure("", err).message.slice(0, 240)}`);
       if (isDailyQuota(err)) throw new Error(GEMINI_DAILY_QUOTA);
       if (!isRetryable(err)) throw err;
       if (tries >= 1 || budget() < RETRY_DELAY_MS + 2_000) throw new Error(GEMINI_BUSY);
