@@ -14,6 +14,7 @@ const TEST_PROMISES = [
   "6f68c627-54b0-4bc0-a504-2eab5af40c67",
   "fb2ef984-15d9-4ce2-a541-e0fbe1f6c67b",
   "73a67e3b-7697-4b75-a9aa-dd9e34379443",
+  "7044695a-f4c7-4087-aaf5-c3459a95f3e4",
   "a945a2bb-91df-4a1b-898c-1c0d31ff12db",
 ];
 
