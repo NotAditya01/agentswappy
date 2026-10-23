@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { judgePromise } from "./agent.ts";
-import { MODEL } from "./model.ts";
-import type { PromiseRecord, ProofCheckResult } from "../lib/types.ts";
+import { judgeGithub, judgePromise } from "./agent.ts";
+import type { PromiseRecord } from "../lib/types.ts";
 
 const originalFetch = globalThis.fetch;
 const previousKey = process.env.GEMINI_API_KEY;
@@ -32,174 +31,95 @@ function githubPromise(owner: string, repo: string): PromiseRecord {
   };
 }
 
-function geminiJson(parts: unknown[]) {
-  return new Response(
-    JSON.stringify({
-      candidates: [{ content: { role: "model", parts }, finishReason: "STOP" }],
-    }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  );
+function githubOnly(commits: number, status = 200) {
+  const seen: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    seen.push(url);
+    if (!url.includes("api.github.com")) throw new Error(`unexpected call to ${url}`);
+    if (status !== 200) return new Response("Not Found", { status });
+    const list = Array.from({ length: commits }, (_, i) => ({
+      sha: `abc${i}def0`,
+      html_url: `https://github.com/o/r/commit/${i}`,
+      commit: { message: `change ${i}`, author: { date: "2026-10-05T10:00:00Z", name: "dev" } },
+    }));
+    return new Response(JSON.stringify(list), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  return seen;
 }
 
-describe("judgePromise", { concurrency: 1 }, () => {
-  test("missing GEMINI_API_KEY throws and does not call Gemini", async () => {
+describe("GitHub verdicts need no model", { concurrency: 1 }, () => {
+  const after = new Date("2026-10-15T00:00:00.000Z");
+  const before = new Date("2026-10-10T00:00:00.000Z");
+
+  test("enough commits is kept, with no Gemini key at all", async () => {
     delete process.env.GEMINI_API_KEY;
-    globalThis.fetch = async () => {
-      throw new Error("fetch should not run");
-    };
+    const seen = githubOnly(2);
     try {
-      await assert.rejects(() => judgePromise(githubPromise("vercel", "next.js")), /GEMINI_API_KEY/);
+      const j = await judgeGithub(githubPromise("vercel", "next.js"), undefined, after);
+      assert.equal(j.verdict, "kept");
+      assert.equal(j.decidedBy, "evidence-rules");
+      assert.match(j.explanation, /^Found 2 commits on vercel\/next\.js between 2026-10-01 00:00 UTC and 2026-10-14 00:00 UTC; needed 1\./);
+      assert.ok(seen.every((u) => !u.includes("generativelanguage")));
+      assert.deepEqual(j.steps.map((s) => s.tool), ["check_github_commits", "record_verdict"]);
     } finally {
       globalThis.fetch = originalFetch;
-      if (previousKey === undefined) delete process.env.GEMINI_API_KEY;
-      else process.env.GEMINI_API_KEY = previousKey;
+      if (previousKey !== undefined) process.env.GEMINI_API_KEY = previousKey;
     }
   });
 
-  test("a Gemini HTTP error is shown and does not become a rule verdict", async () => {
-    process.env.GEMINI_API_KEY = "test-key";
-    globalThis.fetch = async (input) => {
-      const url = String(input);
-      assert.match(url, /generativelanguage\.googleapis\.com/);
-      assert.match(url, new RegExp(MODEL));
-      return new Response(JSON.stringify({ error: { message: "model exploded", status: "INTERNAL" } }), { status: 500 });
-    };
+  test("no commits after the deadline is broken", async () => {
+    githubOnly(0);
     try {
-      await assert.rejects(
-        () => judgePromise(githubPromise("vercel", "next.js")),
-        (err: unknown) => {
-          assert.ok(err instanceof Error);
-          assert.match(err.message, /Gemini (could not check this promise|is busy)/);
-          assert.match(err.message, /Nothing was settled/);
-          assert.doesNotMatch(err.message, /proof checker rules/);
-          return true;
-        },
-      );
+      const j = await judgeGithub(githubPromise("vercel", "next.js"), undefined, after);
+      assert.equal(j.verdict, "broken");
+      assert.match(j.explanation, /Found 0 commits .* needed 1\. The deadline passed/);
     } finally {
       globalThis.fetch = originalFetch;
-      if (previousKey === undefined) delete process.env.GEMINI_API_KEY;
-      else process.env.GEMINI_API_KEY = previousKey;
     }
   });
 
-  test("the model must record a verdict", async () => {
-    process.env.GEMINI_API_KEY = "test-key";
-    globalThis.fetch = async () => geminiJson([{ text: "I looked at it and I am not sure." }]);
+  test("no commits before the deadline stays pending", async () => {
+    githubOnly(0);
     try {
-      await assert.rejects(() => judgePromise(githubPromise("vercel", "next.js")), /did not record a verdict/);
+      const j = await judgeGithub(githubPromise("vercel", "next.js"), undefined, before);
+      assert.equal(j.verdict, "pending");
     } finally {
       globalThis.fetch = originalFetch;
-      if (previousKey === undefined) delete process.env.GEMINI_API_KEY;
-      else process.env.GEMINI_API_KEY = previousKey;
     }
   });
 
-  test("the model calls GitHub, reads the live result, and its verdict is kept", async () => {
-    process.env.GEMINI_API_KEY = "test-key";
-    const urls: string[] = [];
-    const geminiBodies: string[] = [];
-    let turn = 0;
-    const explanation = "I read the commit list for vercel/next.js and I am marking this broken anyway.";
-
-    globalThis.fetch = async (input, init) => {
-      const url = String(input);
-      urls.push(url);
-      const body = typeof init?.body === "string" ? init.body : "";
-      if (!url.includes("generativelanguage.googleapis.com")) return originalFetch(input, init);
-
-      geminiBodies.push(body);
-      turn += 1;
-      if (turn === 1) {
-        return geminiJson([
-          {
-            thoughtSignature: "sig-test",
-            functionCall: { name: "check_github_commits", id: "call-github", args: {} },
-          },
-        ]);
-      }
-      return geminiJson([
-        {
-          functionCall: {
-            name: "record_verdict",
-            id: "call-verdict",
-            args: { verdict: "broken", explanation },
-          },
-        },
-      ]);
-    };
-
+  test("a GitHub error never settles", async () => {
+    githubOnly(0, 404);
     try {
-      const judgment = await judgePromise(githubPromise("vercel", "next.js"));
-      const githubUrl = urls.find((url) => url.includes("api.github.com/repos/vercel/next.js/commits"));
-      assert.ok(githubUrl);
-      const parsed = new URL(githubUrl);
-      assert.equal(parsed.searchParams.get("since"), "2026-10-01T00:00:00.000Z");
-      assert.equal(parsed.searchParams.get("until"), "2026-10-14T00:00:00.000Z");
-      assert.match(geminiBodies[1] ?? "", /sig-test/);
-      assert.match(geminiBodies[1] ?? "", /call-github/);
-      assert.equal(judgment.decidedBy, "agent");
-      assert.equal(judgment.steps[0]?.tool, "check_github_commits");
-      assert.equal(judgment.steps[1]?.tool, "record_verdict");
-
-      const evidence = judgment.steps[0]?.result as ProofCheckResult;
-      assert.equal(evidence.provider, "github");
-      assert.equal(evidence.evidence.owner, "vercel");
-      assert.equal(evidence.evidence.repo, "next.js");
-
-      if (evidence.verified && evidence.suggestedVerdict !== "broken") {
-        assert.equal(judgment.verdict, "broken");
-        assert.equal(judgment.explanation, explanation);
-      } else if (!evidence.verified) {
-        assert.equal(judgment.verdict, "pending");
-        assert.match(judgment.explanation, /stays unsettled/);
-      } else {
-        assert.equal(judgment.verdict, "broken");
-        assert.equal(judgment.explanation, explanation);
-      }
+      const j = await judgeGithub(githubPromise("nobody", "missing"), undefined, after);
+      assert.equal(j.verdict, "pending");
+      assert.match(j.explanation, /GitHub returned 404/);
     } finally {
       globalThis.fetch = originalFetch;
-      if (previousKey === undefined) delete process.env.GEMINI_API_KEY;
-      else process.env.GEMINI_API_KEY = previousKey;
     }
   });
 
-  test("a failed GitHub check cannot be settled just because the model says broken", async () => {
-    process.env.GEMINI_API_KEY = "test-key";
-    let turn = 0;
-    globalThis.fetch = async (input, init) => {
-      const url = String(input);
-      if (!url.includes("generativelanguage.googleapis.com")) return originalFetch(input, init);
-      turn += 1;
-      if (turn === 1) {
-        return geminiJson([
-          { functionCall: { name: "check_github_commits", id: "call-github", args: {} } },
-        ]);
-      }
-      return geminiJson([
-        {
-          functionCall: {
-            name: "record_verdict",
-            id: "call-verdict",
-            args: {
-              verdict: "broken",
-              explanation: "I could not see the repository, so I would break the promise.",
-            },
-          },
-        },
-      ]);
-    };
-
+  test("judgePromise routes GitHub promises past the model", async () => {
+    delete process.env.GEMINI_API_KEY;
+    githubOnly(1);
     try {
-      const judgment = await judgePromise(githubPromise("proof-of-promise-no-such-user-9f3a", "missing"));
-      const evidence = judgment.steps[0]?.result as ProofCheckResult;
-      assert.equal(evidence.verified, false);
-      assert.equal(judgment.verdict, "pending");
-      assert.match(judgment.explanation, /stays unsettled/);
-      assert.equal(judgment.decidedBy, "agent");
+      const j = await judgePromise(githubPromise("vercel", "next.js"));
+      assert.equal(j.decidedBy, "evidence-rules");
+      assert.equal(j.verdict, "kept");
     } finally {
       globalThis.fetch = originalFetch;
-      if (previousKey === undefined) delete process.env.GEMINI_API_KEY;
-      else process.env.GEMINI_API_KEY = previousKey;
+      if (previousKey !== undefined) process.env.GEMINI_API_KEY = previousKey;
+    }
+  });
+
+  test("photo promises still need the Gemini key", async () => {
+    delete process.env.GEMINI_API_KEY;
+    const photo = { ...githubPromise("a", "b"), proofType: "image" as const, criteria: { claim: "a run" } };
+    try {
+      await assert.rejects(() => judgePromise(photo), /GEMINI_API_KEY/);
+    } finally {
+      if (previousKey !== undefined) process.env.GEMINI_API_KEY = previousKey;
     }
   });
 });

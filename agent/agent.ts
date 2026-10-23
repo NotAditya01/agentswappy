@@ -1,8 +1,9 @@
 import { GoogleGenAI, type Content, type Part } from "@google/genai";
 import { callGemini, GEMINI_BUSY, geminiFailure, MODEL, requireGeminiKey } from "./model";
 import { tools, type Tool, type ToolContext } from "./tools";
+import { checkGithubCommits } from "./proofs/github";
 import { clampVerdict } from "@/lib/verdict";
-import type { PromiseRecord, ProofCheckResult, TraceStep, Verdict } from "@/lib/types";
+import type { GithubCriteria, PromiseRecord, ProofCheckResult, TraceStep, Verdict } from "@/lib/types";
 
 export { MODEL };
 
@@ -74,8 +75,8 @@ export async function runAgent(
 
   for (let i = 0; i < maxSteps; i++) {
     if (Date.now() >= deadline) throw new Error(GEMINI_BUSY);
-    const response = await callGemini((abortSignal) => ai.models.generateContent({
-      model: MODEL,
+    const response = await callGemini((abortSignal, model) => ai.models.generateContent({
+      model,
       contents,
       config: {
         systemInstruction: options?.systemPrompt,
@@ -136,8 +137,40 @@ export type Judgment = {
   verdict: Verdict;
   explanation: string;
   steps: TraceStep[];
-  decidedBy: "agent";
+  decidedBy: "agent" | "evidence-rules";
 };
+
+function shortTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : `${d.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+// GitHub promises are a plain count, so no model is involved in the verdict.
+export async function judgeGithub(
+  promise: PromiseRecord,
+  check: typeof checkGithubCommits = checkGithubCommits,
+  now = new Date(),
+): Promise<Judgment> {
+  const criteria = promise.criteria as GithubCriteria;
+  const result = await check({ criteria, deadline: promise.deadline, createdAt: promise.createdAt, now });
+  const steps: TraceStep[] = [{ tool: "check_github_commits", args: {}, result }];
+  const evidence = result.evidence as { commitCount?: number; since?: string; until?: string };
+
+  if (!result.verified) {
+    return { verdict: "pending", explanation: `${result.summary} Nothing was settled.`, steps, decidedBy: "evidence-rules" };
+  }
+
+  const count = evidence.commitCount ?? 0;
+  const since = shortTime(evidence.since ?? criteria.since ?? promise.createdAt);
+  const until = shortTime(evidence.until ?? promise.deadline);
+  const by = criteria.author ? ` by @${criteria.author}` : "";
+  const found = `Found ${count} commit${count === 1 ? "" : "s"}${by} on ${criteria.owner}/${criteria.repo} between ${since} and ${until}; needed ${criteria.minCommits}.`;
+  const verdict = result.suggestedVerdict;
+  const tail =
+    verdict === "kept" ? " Promise kept." : verdict === "broken" ? " The deadline passed, so the promise is broken." : " The deadline has not passed yet.";
+  steps.push({ tool: "record_verdict", args: { verdict, explanation: found + tail }, result: { saved: true, verdict } });
+  return { verdict, explanation: found + tail, steps, decidedBy: "evidence-rules" };
+}
 
 function latestEvidence(steps: TraceStep[]): ProofCheckResult | null {
   for (let i = steps.length - 1; i >= 0; i--) {
@@ -148,6 +181,7 @@ function latestEvidence(steps: TraceStep[]): ProofCheckResult | null {
 }
 
 export async function judgePromise(promise: PromiseRecord): Promise<Judgment> {
+  if (promise.proofType === "github_commits") return judgeGithub(promise);
   const ctx: ToolContext = { baseUrl: "", promise, evidenceSeen: false, recorded: null };
   let steps: TraceStep[] = [];
   let answer = "";
