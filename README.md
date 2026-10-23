@@ -17,7 +17,8 @@ Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes 
 ## Key features
 
 - Make a promise with a deadline, a stake, a proof type, and who gets the money if you break it
-- Gemini agent calls a proof tool, reads the evidence and records `kept`, `broken` or `pending`
+- GitHub promises are decided by a plain commit count from the GitHub API, with no model call
+- Photo promises: a Gemini agent calls the proof tool, reads the evidence and records `kept`, `broken` or `pending`
 - Live GitHub commit checks for a repo, author and date window
 - Photo proof checked with Gemini vision. Photos are shrunk in the browser to under 650 KB before upload
 - Promises and photos saved in Upstash Redis, so they survive redeploys
@@ -66,7 +67,7 @@ flowchart TD
 
 You write a promise (what, deadline, proof, stake, and who receives it if you break it). The list starts empty. **Try an example** only fills the form.
 
-**Check proof** asks Gemini to call the matching tool, read the result, and record the verdict. GitHub reads the live commits API for the repository and date window you entered. A photo (or a workout screenshot from any fitness app) is sent to Gemini vision, which also reads distance and date. If `GEMINI_API_KEY` is missing or Gemini errors, the page shows the error and nothing is settled.
+**Check proof** for a GitHub promise counts commits on the repository between creation and the deadline straight from the GitHub API, and decides `kept` (count reaches the target) or `broken` (deadline passed without it). No model is involved, so a Gemini outage or quota can't block it. For a photo promise, Gemini calls the matching tool, reads the result, and records the verdict. A photo (or a workout screenshot from any fitness app) is sent to Gemini vision, which also reads distance and date. If `GEMINI_API_KEY` is missing or Gemini errors, the page shows the error and nothing is settled.
 
 `kept` and `broken` call `settleStake()` in `agent/wallet.ts` with `mocked: true` and no `txHash`. The page labels that settlement simulated.
 
@@ -102,7 +103,9 @@ Ask Swappy (`POST /api/ask`, `lib/intent.ts`, `lib/transfer.ts`) adds:
 | --- | --- |
 | Agent (tool calling) | `gemini-3.6-flash` (default) |
 | Photo checks (vision) | Same model, `gemini-3.6-flash` |
-| Override | Set `GEMINI_MODEL` to any Gemini model that supports function calling and image input, e.g. `gemini-3.8-flash` or `gemini-3.5-flash-lite` |
+| Override | Set `GEMINI_MODEL` to any Gemini model that supports function calling and image input |
+| Fallback (optional) | Set `GEMINI_FALLBACK_MODEL`. It is only tried when the primary model hits its daily quota |
+| GitHub checks | No model. The verdict comes from the commit count |
 
 ## Tech stack
 
@@ -134,8 +137,9 @@ npm run dev
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | Yes, for every check | [Google AI Studio](https://aistudio.google.com/apikey) |
+| `GEMINI_API_KEY` | Yes, for photo checks and Ask Swappy | [Google AI Studio](https://aistudio.google.com/apikey) |
 | `GEMINI_MODEL` | No | Default `gemini-3.6-flash` (tool calling and images) |
+| `GEMINI_FALLBACK_MODEL` | No | Second Gemini model, used when the first one's daily quota is used up |
 | `GITHUB_TOKEN` | No | Public commits only; helps rate limits |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | No | Upstash Redis REST (set by the Vercel Marketplace integration). `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` also work. Without them promises go to a local file |
 | `WALLET_PRIVATE_KEY` | No | Agent wallet on Base Sepolia. Settles escrow stakes, credits backings and sends small transfers. Testnet only |
