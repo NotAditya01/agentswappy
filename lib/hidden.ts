@@ -12,6 +12,8 @@ const TEST_PROMISES = [
   "6e7d59c2-812e-421b-9218-ad10df9c827b",
   "c0ec4602-d300-4dc5-8145-08a788e09512",
   "6f68c627-54b0-4bc0-a504-2eab5af40c67",
+  "fb2ef984-15d9-4ce2-a541-e0fbe1f6c67b",
+  "73a67e3b-7697-4b75-a9aa-dd9e34379443",
 ];
 
 export function hiddenIds(env = process.env.HIDDEN_PROMISE_IDS): Set<string> {
