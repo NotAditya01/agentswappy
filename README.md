@@ -12,7 +12,7 @@ Stake USDC on a personal promise. Swappy checks your proof (GitHub commits or a 
 
 Everyone says "I'll ship it this week" or "I'll start running." Nothing happens when we don't. Telling friends doesn't stick, and asking a friend to judge is awkward. Proof of Promise puts money on the line and lets Swappy be the neutral judge: it reads the real evidence and settles the stake.
 
-Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes are real testnet USDC in an escrow contract. Friends back promises with x402 payments that land in the same escrow.
+Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes are real testnet USDC in an escrow contract. Promises are backed with x402 payments that land in the same escrow, either from your own wallet or paid by Swappy itself.
 
 ## Key features
 
@@ -38,6 +38,28 @@ Built for Rise In Agentmaxxing. Everything runs on Base Sepolia testnet. Stakes 
 - Wallet errors in plain words (wrong network, rejected, not enough USDC)
 - **Workout screenshots:** photo proof also works for a screenshot from any fitness app. Gemini vision reads the distance and date
 
+## Week 3: x402
+
+Swappy is on both sides of x402. It runs the paid resource (`POST /api/promises/:id/back`) and it is also an x402 client that can pay that resource from its own wallet when you ask it to.
+
+**Swappy pays (Ask Swappy)**
+
+1. You type "back <promise> with 0.1 USDC" in Ask Swappy and press Confirm on the review card. "Swappy pays via x402" is picked by default.
+2. The server (`POST /api/agent/back`, `agent/x402-pay.ts`) calls `/back?amount=0.1` with no payment and gets `402 Payment Required` with the price: exact scheme, `base-sepolia`, USDC, `payTo` = the escrow.
+3. Swappy checks the quote before signing anything. Wrong token, network, amount or recipient and it stops. It pays at most 2 USDC per backing and shares the agent wallet's rate limit (3 per hour per IP, 10 per day).
+4. It signs an EIP-3009 `transferWithAuthorization` with the agent key and retries the request with the `X-PAYMENT` header.
+5. The endpoint verifies the payment with the facilitator, then asks it to settle. The facilitator submits the USDC transfer on Base Sepolia and pays the gas.
+6. Swappy calls `creditBacking` on the escrow so the backing counts toward the refund or payout.
+7. The steps stream back to the page as they happen (402, signed, settling, settled). The result shows the x402 payment tx and the credit tx, both linking to BaseScan.
+
+**You pay (your wallet)**
+
+Same flow, but the browser does steps 2 to 4 and your wallet signs the authorization (no gas). Use the "Back with USDC" button on a promise page, or pick "Your wallet via x402" in Ask Swappy.
+
+Each backing on the promise page has two links: **x402 payment** (the facilitator's settlement) and **Credited by Swappy** (the `creditBacking` call).
+
+The public x402.org facilitator sends a lot of transactions from one key and sometimes trips on its own nonce. Swappy retries settle a few times in that case only. The EIP-3009 nonce means a retry can never charge twice.
+
 ## How it works
 
 ```mermaid
@@ -52,12 +74,12 @@ flowchart TD
   GH --> Agent
   Vision --> Agent
   Agent --> Verdict{"kept / broken / pending"}
-  Verdict -->|kept| Refund["Simulated refund"]
-  Verdict -->|broken| Payout["Simulated payout"]
+  Verdict -->|kept: settle refund| Chain["USDC escrow on Base Sepolia"]
+  Verdict -->|broken: settle payout| Chain
   Verdict --> Store
-  Refund -.->|week 3| Chain["USDC escrow on Base Sepolia"]
-  Payout -.->|week 3| Chain
-  Friend["Friend"] -->|x402 payment| Back["POST /api/promises/:id/back"]
+  Friend["Friend's wallet"] -->|x402 payment| Back["POST /api/promises/:id/back"]
+  Ask["Ask Swappy"] --> AgentPay["Swappy pays: POST /api/agent/back"]
+  AgentPay -->|402, sign, X-PAYMENT| Back
   Back -->|verify + settle| Facilitator["x402 facilitator"]
   Facilitator -->|USDC| Chain
   Back -->|creditBacking| Chain
@@ -69,7 +91,7 @@ You write a promise (what, deadline, proof, stake, and who receives it if you br
 
 **Check proof** for a GitHub promise counts commits on the repository between creation and the deadline straight from the GitHub API, and decides `kept` (count reaches the target) or `broken` (deadline passed without it). No model is involved, so a Gemini outage or quota can't block it. For a photo promise, Gemini calls the matching tool, reads the result, and records the verdict. A photo (or a workout screenshot from any fitness app) is sent to Gemini vision, which also reads distance and date. If `GEMINI_API_KEY` is missing or Gemini errors, the page shows the error and nothing is settled.
 
-`kept` and `broken` call `settleStake()` in `agent/wallet.ts` with `mocked: true` and no `txHash`. The page labels that settlement simulated.
+`kept` and `broken` call `settleStake()` in `agent/wallet.ts`. For promises staked in the escrow it sends `settle` on chain: the stake and backings go back to the maker and backers if kept, or to the friend if broken, and the tx shows on the promise page. Only old promises made before the escrow existed settle as simulated.
 
 Promises are stored in Upstash Redis when its env vars are set, photos included (up to 700 KB each). Without Redis they go to `data/promises.json` locally, or `/tmp` on Vercel, where cold starts wipe them. `GET /api/promises` reports which one is in use as `meta.storage`. The app does not seed sample promises.
 
@@ -91,8 +113,11 @@ Ask Swappy (`POST /api/ask`, `lib/intent.ts`, `lib/transfer.ts`) adds:
 | Tool | What it does |
 | --- | --- |
 | Create promise | Reads "I promise to..." and fills the promise form. You review and fund it from your wallet |
-| Back promise | Finds the promise you mean by id or title and backs it with USDC from your wallet |
-| x402 backing | `lib/x402.ts` builds the 402 price, signs the EIP-3009 payment in the browser, and verifies/settles it through the facilitator before `creditBacking` |
+| Back promise | Finds the promise you mean by id or title and backs it over x402, paid by Swappy or by your wallet |
+| x402 resource (`/back`) | `lib/x402.ts` builds the 402 price, checks the `X-PAYMENT` header, and verifies/settles it through the facilitator before `creditBacking` |
+| x402 agent payment (new) | `agent/x402-pay.ts` + `POST /api/agent/back`: Swappy requests `/back`, reads the 402, checks the quote, signs EIP-3009 with the agent wallet and retries with `X-PAYMENT`. Capped at 2 USDC, rate-limited, streams each step |
+| x402 wallet payment | `backWithX402` in `lib/fund.ts`: same flow, signed by your browser wallet |
+| Settle retry (new) | `settleWithRetry` in `lib/x402.ts`: retries settle only when the facilitator clashes on its own nonce |
 | Send tokens | Parses "send 1 USDC to 0x..." into a transfer. Agent wallet sends are capped at 2 USDC (0.001 ETH) per transfer and need a Confirm click |
 | Chain-state read | `lib/chain-state.ts` reads `getPromise` and the grace period from the escrow for every promise |
 | Expire and refund | Calls `expire` on the escrow after deadline + grace, returning the stake to the maker and backers |
@@ -104,19 +129,21 @@ Ask Swappy (`POST /api/ask`, `lib/intent.ts`, `lib/transfer.ts`) adds:
 | Agent (tool calling) | `gemini-3.6-flash` (default) |
 | Photo checks (vision) | Same model, `gemini-3.6-flash` |
 | Override | Set `GEMINI_MODEL` to any Gemini model that supports function calling and image input |
-| Fallback (optional) | Set `GEMINI_FALLBACK_MODEL`. It is only tried when the primary model hits its daily quota |
+| Fallback | `gemini-3.8-flash` (set via `GEMINI_FALLBACK_MODEL` in production). Only used when `gemini-3.6-flash` hits its daily quota |
 | GitHub checks | No model. The verdict comes from the commit count |
 
 ## Tech stack
 
 | | Version |
 | --- | --- |
-| Next.js (App Router, Turbopack) | 16.4.0 |
+| Next.js (App Router, Turbopack) | 16.4.2 |
 | React | 19.3.0 |
 | TypeScript | 5.9.3 |
 | Tailwind CSS | 4.3.3 |
 | Google Gen AI SDK (`@google/genai`) | 2.28.0 |
 | viem (Base Sepolia escrow, wallet, transfers) | 2.57.4 |
+| x402 | v1, `exact` scheme, own implementation in `lib/x402.ts` (no SDK) |
+| x402 facilitator | x402.org (Base Sepolia) |
 | Upstash Redis (REST API via `fetch`, no SDK) | n/a |
 | Node.js | 20+ |
 | Hosting | Vercel (Node.js runtime) |
@@ -144,6 +171,7 @@ npm run dev
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | No | Upstash Redis REST (set by the Vercel Marketplace integration). `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` also work. Without them promises go to a local file |
 | `WALLET_PRIVATE_KEY` | No | Agent wallet on Base Sepolia. Settles escrow stakes, credits backings and sends small transfers. Testnet only |
 | `X402_FACILITATOR_URL` | No | Default `https://x402.org/facilitator` (free, Base Sepolia) |
+| `X402_SELF_ORIGIN` | No | Base URL Swappy pays when it backs a promise. Defaults to the request's own origin |
 
 Do not commit `.env`, `.agent-wallet.json`, or `data/`.
 
@@ -155,12 +183,14 @@ Import on [Vercel](https://vercel.com/new) and set `GEMINI_API_KEY`. API routes 
 
 1. Make a promise. Pick GitHub or a photo (a workout screenshot works too).
 2. It shows up in the list with a status.
-3. **Check proof** runs the agent and shows the tools it called, the evidence, the verdict, and the simulated settlement.
+3. Back it: ask Swappy ("back <promise> with 0.1 USDC") and Swappy pays over x402, or use "Back with USDC" to pay from your wallet.
+4. **Check proof** runs the agent and shows the tools it called, the evidence, the verdict, and the settlement tx.
 
 Past deadlines are allowed, so a GitHub window that already ended can be checked.
 
 ## Demo links
 
+Week 1 (proofofpromise.v1): not submitted (joined at Week 2)  
 Week 2 (proofofpromise.v2): https://youtu.be/mULHLHCVfV4  
 Week 3 (proofofpromise.v3): https://youtu.be/_TlOQUOXvm8
 
@@ -168,8 +198,12 @@ Live: https://proof-of-promise.vercel.app
 
 ## Future scope
 
-- Mainnet once the escrow is audited
+- x402 v2 and more facilitators, so a busy public facilitator isn't a single point of failure
+- More chains the facilitators already support (Base mainnet after an audit, Polygon Amoy, Avalanche Fuji)
+- Let other agents back promises through the same x402 endpoint, with a small public spec
+- Deadline reminders by email before a promise closes
 - Group promises, where a few friends stake on the same goal
+- Mainnet once the escrow is audited
 
 ## Social
 
