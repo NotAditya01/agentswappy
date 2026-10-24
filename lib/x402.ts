@@ -154,3 +154,21 @@ export function settleWithFacilitator(payment: PaymentPayload, req: PaymentRequi
     req,
   );
 }
+
+// The public facilitator sends a lot of txs from one key and sometimes clashes on its own nonce.
+// Nothing was submitted in that case, and the EIP-3009 nonce stops a double charge, so retrying is safe.
+const NONCE_CLASH = /replacement transaction underpriced|nonce too low/i;
+
+export async function settleWithRetry(
+  payment: PaymentPayload,
+  req: PaymentRequirements,
+  settle = settleWithFacilitator,
+  tries = 4,
+  waitMs = 1500,
+) {
+  for (let i = 1; ; i++) {
+    const result = await settle(payment, req);
+    if (result.success || i >= tries || !NONCE_CLASH.test(result.errorReason ?? "")) return result;
+    await new Promise((resolve) => setTimeout(resolve, waitMs * i));
+  }
+}

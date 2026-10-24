@@ -5,13 +5,19 @@ import {
   decodePayment,
   matchesRequirements,
   parseBackingAmount,
-  settleWithFacilitator,
+  settleWithRetry,
   verifyWithFacilitator,
 } from "@/lib/x402";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+// Facilitator errors can carry a whole viem dump. Keep the first line.
+function brief(reason: string | undefined, fallback: string): string {
+  const line = (reason ?? "").split("\n")[0].trim();
+  return line ? line.slice(0, 200) : fallback;
+}
 
 function fail(err: unknown, fallback: string) {
   const status = err instanceof BackingError ? err.status : 502;
@@ -56,10 +62,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const verified = await verifyWithFacilitator(payment, requirements).catch((err: Error) => ({ isValid: false, invalidReason: err.message }));
   if (!verified.isValid) {
-    return Response.json({ x402Version: 1, error: verified.invalidReason || "Payment is not valid.", accepts: [requirements] }, { status: 402 });
+    return Response.json({ x402Version: 1, error: brief(verified.invalidReason, "Payment is not valid."), accepts: [requirements] }, { status: 402 });
   }
 
-  const settled = await settleWithFacilitator(payment, requirements).catch((err: Error) => ({
+  const settled = await settleWithRetry(payment, requirements).catch((err: Error) => ({
     success: false as const,
     errorReason: err.message,
     transaction: undefined,
@@ -67,7 +73,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     payer: undefined,
   }));
   if (!settled.success || !settled.transaction) {
-    return Response.json({ x402Version: 1, error: settled.errorReason || "Payment did not settle.", accepts: [requirements] }, { status: 402 });
+    return Response.json({ x402Version: 1, error: `Facilitator: ${brief(settled.errorReason, "Payment did not settle.")}`, accepts: [requirements] }, { status: 402 });
   }
 
   const paymentResponse = btoa(

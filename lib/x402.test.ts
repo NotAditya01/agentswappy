@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { verifyTypedData } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { backingRequirements, decodePayment, matchesRequirements, parseBackingAmount, signPayment } from "./x402.ts";
+import { backingRequirements, decodePayment, matchesRequirements, parseBackingAmount, settleWithRetry, signPayment } from "./x402.ts";
 
 const escrow = "0x0cb3d1093AeD5E812f2f4Fd1a3cF92f93868782d";
 const req = backingRequirements({ amountUsdc: "0.25", resource: "https://x.test/api/promises/p1/back?amount=0.25", payTo: escrow });
@@ -61,4 +61,25 @@ test("junk headers are rejected", () => {
   assert.equal(decodePayment(null), null);
   assert.equal(decodePayment("not base64 json"), null);
   assert.equal(decodePayment(btoa(JSON.stringify({ x402Version: 2 }))), null);
+});
+
+test("settle retries only when the facilitator clashes on its own nonce", async () => {
+  const payment = { x402Version: 1, scheme: "exact", network: "base-sepolia", payload: {} } as never;
+  let calls = 0;
+  const flaky = async () => {
+    calls++;
+    return calls < 3 ? { success: false, errorReason: "Details: replacement transaction underpriced" } : { success: true, transaction: "0xabc" as `0x${string}` };
+  };
+  const ok = await settleWithRetry(payment, req, flaky, 4, 1);
+  assert.equal(ok.success, true);
+  assert.equal(calls, 3);
+
+  calls = 0;
+  const invalid = async () => {
+    calls++;
+    return { success: false, errorReason: "invalid_signature" };
+  };
+  const bad = await settleWithRetry(payment, req, invalid, 4, 1);
+  assert.equal(bad.success, false);
+  assert.equal(calls, 1);
 });
