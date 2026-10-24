@@ -6,7 +6,7 @@
 
 Stake USDC on a personal promise. Swappy checks your proof (GitHub commits or a photo, including workout screenshots from any fitness app) and decides whether you get the stake back or it goes to a friend or charity.
 
-**Live:** https://proof-of-promise.vercel.app · **Week 2 demo:** [YouTube](https://youtu.be/mULHLHCVfV4)  · **Week 3 demo:** [YouTube](https://youtu.be/_TlOQUOXvm8)
+**Live:** https://proof-of-promise.vercel.app · **Week 2 demo:** [YouTube](https://youtu.be/mULHLHCVfV4)  · **Week 3 demo:** [YouTube](https://youtu.be/VQLjkb55qJA)
 
 ## The problem
 
@@ -54,15 +54,7 @@ Swappy is on both sides of x402. It runs the paid resource (`POST /api/promises/
 
 **Why Swappy pays**
 
-Swappy pays on the backer's behalf from a capped agent budget (2 USDC per backing). In this testnet demo that budget is Swappy's own test USDC, so Swappy is recorded as the backer and refunds go back to that budget. In production the backer would top up their budget first, and refunds would go back to them. If you'd rather pay directly, use the "Back with USDC" button. That's x402 too, signed from your own wallet.
-
-Example:
-
-1. A friend tops up their Swappy budget with 5 USDC.
-2. They ask Swappy to back your promise with 1 USDC.
-3. Swappy pays the 1 USDC over x402 from that budget, with the friend recorded as the backer.
-4. You keep the promise, so the 1 USDC goes back to the friend.
-5. If you break it, the 1 USDC goes to the person you named to get the money, same as your stake.
+Swappy pays on the backer's behalf from a small capped budget (2 USDC). On testnet that's Swappy's own test USDC; to pay directly, use Back with USDC (also x402).
 
 **You pay (your wallet)**
 
@@ -204,7 +196,7 @@ Past deadlines are allowed, so a GitHub window that already ended can be checked
 
 Week 1 (proofofpromise.v1): not submitted (joined at Week 2)  
 Week 2 (proofofpromise.v2): https://youtu.be/mULHLHCVfV4  
-Week 3 (proofofpromise.v3): https://youtu.be/_TlOQUOXvm8
+Week 3 (proofofpromise.v3): https://youtu.be/VQLjkb55qJA
 
 Live: https://proof-of-promise.vercel.app
 
@@ -215,7 +207,7 @@ Live: https://proof-of-promise.vercel.app
 - Let other agents back promises through the same x402 endpoint, with a small public spec
 - Deadline reminders by email before a promise closes
 - Group promises, where a few friends stake on the same goal
-- Backer-funded agent budgets (top up Swappy, refunds go back to you)
+- Backer-funded Swappy budgets
 - Mainnet once the escrow is audited
 
 ## Social
