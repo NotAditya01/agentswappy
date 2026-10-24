@@ -52,6 +52,18 @@ Swappy is on both sides of x402. It runs the paid resource (`POST /api/promises/
 6. Swappy calls `creditBacking` on the escrow so the backing counts toward the refund or payout.
 7. The steps stream back to the page as they happen (402, signed, settling, settled). The result shows the x402 payment tx and the credit tx, both linking to BaseScan.
 
+**Why Swappy pays**
+
+Swappy pays on the backer's behalf from a capped agent budget (2 USDC per backing). In this testnet demo that budget is Swappy's own test USDC, so Swappy is recorded as the backer and refunds go back to that budget. In production the backer would top up their budget first, and refunds would go back to them. If you'd rather pay directly, use the "Back with USDC" button. That's x402 too, signed from your own wallet.
+
+Example:
+
+1. A friend tops up their Swappy budget with 5 USDC.
+2. They ask Swappy to back your promise with 1 USDC.
+3. Swappy pays the 1 USDC over x402 from that budget, and the escrow records the friend as the backer.
+4. You keep the promise, so the 1 USDC goes back to the friend.
+5. If you break it, the 1 USDC goes to them as the payout instead.
+
 **You pay (your wallet)**
 
 Same flow, but the browser does steps 2 to 4 and your wallet signs the authorization (no gas). Use the "Back with USDC" button on a promise page, or pick "Your wallet via x402" in Ask Swappy.
@@ -203,6 +215,7 @@ Live: https://proof-of-promise.vercel.app
 - Let other agents back promises through the same x402 endpoint, with a small public spec
 - Deadline reminders by email before a promise closes
 - Group promises, where a few friends stake on the same goal
+- Backer-funded agent budgets (top up Swappy, refunds go back to you)
 - Mainnet once the escrow is audited
 
 ## Social
