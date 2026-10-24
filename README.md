@@ -60,9 +60,9 @@ Example:
 
 1. A friend tops up their Swappy budget with 5 USDC.
 2. They ask Swappy to back your promise with 1 USDC.
-3. Swappy pays the 1 USDC over x402 from that budget, and the escrow records the friend as the backer.
+3. Swappy pays the 1 USDC over x402 from that budget, with the friend recorded as the backer.
 4. You keep the promise, so the 1 USDC goes back to the friend.
-5. If you break it, the 1 USDC goes to them as the payout instead.
+5. If you break it, the 1 USDC goes to the person you named to get the money, same as your stake.
 
 **You pay (your wallet)**
 
