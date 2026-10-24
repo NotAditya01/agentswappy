@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useWallet } from "@/components/wallet-provider";
 import { txUrl } from "@/lib/escrow";
 import { formatUsdc } from "@/lib/format";
-import { sendBacking, sendFromWallet } from "@/lib/fund";
+import { backWithX402, sendFromWallet } from "@/lib/fund";
 import type { Intent, PromisePrefill } from "@/lib/intent";
 import type { Sender } from "@/lib/transfer";
 
@@ -49,13 +49,16 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
   const [sender, setSender] = useState<Sender>("agent");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ text: string; hash?: string } | null>(null);
+  const [payer, setPayer] = useState<Sender>("agent");
+  const [steps, setSteps] = useState<string[]>([]);
+  const [done, setDone] = useState<{ text: string; hash?: string; links?: { label: string; hash: string }[] } | null>(null);
 
   async function ask(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
     setDone(null);
     setReply(null);
+    setSteps([]);
     setBusy("Swappy is reading that…");
     try {
       const res = await fetch("/api/ask", {
@@ -67,6 +70,7 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
       if (!res.ok) throw new Error(data.error || "Could not read that.");
       setReply(data);
       setSender(data.agentAddress ? "agent" : "wallet");
+      setPayer(data.agentAddress ? "agent" : "wallet");
     } catch (err) {
       setError(walletErrorMessage(err));
     }
@@ -88,18 +92,20 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
         onPrefill(intent.prefill);
         setDone({ text: "The form below is filled in. Check it, then make the promise." });
       } else if (intent.kind === "back_promise") {
-        const from = await walletAccount();
-        setBusy("Send the USDC to the escrow in your wallet…");
-        const hash = await sendBacking(intent.amountUsdc, from);
-        setBusy("Swappy is crediting your backing…");
-        const res = await fetch(`/api/promises/${intent.promise.id}/back`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ txHash: hash }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(`${data.error || "The backing was sent but not credited."} Your transfer: ${hash}`);
-        setDone({ text: `Backed with ${formatUsdc(intent.amountUsdc)} USDC.`, hash: data.backings?.at(-1)?.creditTx ?? hash });
+        if (payer === "agent") {
+          await agentPays(intent.promise.id, intent.amountUsdc);
+        } else {
+          const from = await walletAccount();
+          setSteps([]);
+          setBusy("Asking the back endpoint for its price…");
+          const before = new Set((await currentBackings(intent.promise.id)).map((b) => b.txHash.toLowerCase()));
+          const saved = await backWithX402(intent.promise.id, intent.amountUsdc, from, (step) => setBusy(step));
+          const mine = saved.backings?.find((b) => !before.has(b.txHash.toLowerCase()));
+          setDone({
+            text: `You paid ${formatUsdc(intent.amountUsdc)} USDC via x402.`,
+            links: mine ? [{ label: "x402 payment", hash: mine.txHash }, { label: "Credited by Swappy", hash: mine.creditTx }] : [],
+          });
+        }
         await refreshBalance();
         await onChanged();
       } else if (intent.kind === "send") {
@@ -129,9 +135,65 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
     setBusy(null);
   }
 
+  async function currentBackings(id: string): Promise<{ txHash: string; creditTx: string }[]> {
+    const res = await fetch(`/api/promises/${id}`);
+    const data = await res.json().catch(() => null);
+    return data?.backings ?? [];
+  }
+
+  // Swappy pays its own x402 endpoint from the agent wallet. The server streams each step.
+  async function agentPays(promiseId: string, amountUsdc: string) {
+    const amount = formatUsdc(amountUsdc);
+    setSteps([]);
+    setBusy("Swappy is requesting the paid endpoint…");
+    const res = await fetch("/api/agent/back", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ promiseId, amountUsdc, confirmed: true }),
+    });
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Swappy could not pay.");
+    }
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    for (;;) {
+      const { value, done: finished } = await reader.read();
+      if (value) buffer += value;
+      const lines = buffer.split("\n");
+      buffer = finished ? "" : (lines.pop() ?? "");
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.step === "quote") {
+          setSteps((s) => [...s, `402 Payment Required: ${amount} USDC to escrow ${short(ev.payTo)} on ${ev.network}`]);
+          setBusy("Swappy is signing the payment…");
+        } else if (ev.step === "signed") {
+          setSteps((s) => [...s, `Signed EIP-3009 USDC authorization with Swappy's wallet ${short(ev.from)}`]);
+        } else if (ev.step === "paying") {
+          setSteps((s) => [...s, "Retried with X-PAYMENT, facilitator is settling on Base Sepolia…"]);
+          setBusy("Facilitator is settling, then Swappy credits the backing…");
+        } else if (ev.step === "settled") {
+          setSteps((s) => [...s, "Settled on chain and credited to the promise"]);
+          setDone({
+            text: `Swappy paid ${amount} USDC via x402.`,
+            links: [
+              { label: "x402 payment", hash: ev.paymentTx },
+              { label: "Credited by Swappy", hash: ev.creditTx },
+            ],
+          });
+        } else if (ev.step === "error") {
+          throw new Error(ev.paymentTx ? `${ev.error} Payment tx: ${ev.paymentTx}` : ev.error);
+        }
+      }
+      if (finished) break;
+    }
+  }
+
   const intent = reply?.intent;
   const overCap =
-    intent?.kind === "send" && sender === "agent" && Number(intent.transfer.amount) > Number(reply?.agentCap[intent.transfer.token]);
+    (intent?.kind === "send" && sender === "agent" && Number(intent.transfer.amount) > Number(reply?.agentCap[intent.transfer.token])) ||
+    (intent?.kind === "back_promise" && payer === "agent" && Number(intent.amountUsdc) > Number(reply?.agentCap.USDC));
 
   return (
     <section className="flex flex-col gap-3">
@@ -183,8 +245,19 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
               <>
                 <Row label="Back">{intent.promise.description}</Row>
                 <Row label="Amount">{formatUsdc(intent.amountUsdc)} USDC</Row>
-                <Row label="From">{account ? `Your wallet (${short(account)})` : "Your wallet (connect on confirm)"}</Row>
-                <Row label="Goes to">The promise escrow. Refunded to you if it is kept, paid to the friend if broken.</Row>
+                <Row label="Paid by">
+                  <span className="flex flex-col gap-1">
+                    <label className="flex items-center gap-2">
+                      <input type="radio" checked={payer === "agent"} disabled={!reply?.agentAddress} onChange={() => setPayer("agent")} />
+                      Swappy pays via x402 {reply?.agentAddress ? `(${short(reply.agentAddress)})` : "(not set up)"}
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" checked={payer === "wallet"} disabled={installed !== true} onChange={() => setPayer("wallet")} />
+                      Your wallet via x402 {installed !== true ? "(no browser wallet found)" : account ? `(${short(account)}, you sign it)` : "(you sign it)"}
+                    </label>
+                  </span>
+                </Row>
+                <Row label="Goes to">The promise escrow. Refunded to the payer if it is kept, paid to the friend if broken.</Row>
                 <Row label="Network">Base Sepolia (testnet)</Row>
               </>
             )}
@@ -214,6 +287,9 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
               Swappy&apos;s wallet sends at most {reply?.agentCap[intent.transfer.token]} {intent.transfer.token}. Use your wallet instead.
             </p>
           )}
+          {overCap && intent.kind === "back_promise" && (
+            <p className="text-destructive">Swappy pays at most {reply?.agentCap.USDC} USDC per backing. Pay from your wallet instead.</p>
+          )}
           <div className="flex gap-2">
             <Button onClick={confirm} disabled={Boolean(busy) || Boolean(overCap)}>
               {intent.kind === "create_promise" ? "Confirm and fill the form" : "Confirm"}
@@ -227,15 +303,35 @@ export function AskSwappy({ onPrefill, onChanged }: { onPrefill: (prefill: Promi
 
       {busy && <p className="text-sm text-muted-foreground">{busy}</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {steps.length > 0 && (
+        <ol className="flex flex-col gap-1 rounded-md border px-4 py-3 font-mono text-xs text-muted-foreground" aria-label="x402 steps">
+          {steps.map((step, i) => (
+            <li key={i}>
+              <span className="text-foreground/40">{i + 1}.</span> {step}
+            </li>
+          ))}
+        </ol>
+      )}
+
       {done && (
-        <p className="text-sm">
-          {done.text}{" "}
-          {done.hash && (
-            <a className="break-all font-mono text-xs underline underline-offset-4" href={txUrl(done.hash)} target="_blank" rel="noreferrer">
-              {done.hash}
-            </a>
-          )}
-        </p>
+        <div className="flex flex-col gap-1 text-sm">
+          <p>
+            {done.text}{" "}
+            {done.hash && (
+              <a className="break-all font-mono text-xs underline underline-offset-4" href={txUrl(done.hash)} target="_blank" rel="noreferrer">
+                {done.hash}
+              </a>
+            )}
+          </p>
+          {done.links?.map((link) => (
+            <p key={link.hash} className="flex flex-wrap gap-x-2 text-xs">
+              <span className="text-muted-foreground">{link.label}</span>
+              <a className="break-all font-mono underline underline-offset-4" href={txUrl(link.hash)} target="_blank" rel="noreferrer">
+                {link.hash}
+              </a>
+            </p>
+          ))}
+        </div>
       )}
     </section>
   );
