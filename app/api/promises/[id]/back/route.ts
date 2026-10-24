@@ -74,7 +74,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     JSON.stringify({ success: true, transaction: settled.transaction, network: settled.network ?? requirements.network, payer: settled.payer }),
   );
   try {
-    const promise = await creditWalletBacking(id, settled.transaction);
+    const promise = await creditWalletBacking(id, settled.transaction, "x402");
     return Response.json(promise, { headers: { "X-PAYMENT-RESPONSE": paymentResponse } });
   } catch (err) {
     // The USDC is in the escrow even if crediting failed; the payment tx can be credited again with { txHash }.

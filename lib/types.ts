@@ -80,7 +80,8 @@ export type SettlementIntent = {
   beneficiaryAddress: string;
 };
 
-export type Backing = { backer: string; amountUsdc: string; txHash: string; creditTx: string; at: string };
+// via: how the USDC reached the escrow. Older records have no via.
+export type Backing = { backer: string; amountUsdc: string; txHash: string; creditTx: string; at: string; via?: "x402" | "transfer" };
 
 export type ChainState = {
   status: "none" | "open" | "kept" | "broken" | "expired";

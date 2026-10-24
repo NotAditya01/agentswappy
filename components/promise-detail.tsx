@@ -184,7 +184,12 @@ export function PromiseDetail({
             <h2 className="text-xs font-medium text-muted-foreground">Transactions</h2>
             <div className="divide-y rounded-md border text-sm">
               {promise.onchain && <TxLink label="Stake locked" hash={promise.onchain.createTx} />}
-              {backers.map((b) => <TxLink key={b.creditTx} label={`Backed ${formatUsdc(b.amountUsdc)}`} hash={b.creditTx} />)}
+              {backers.map((b) => (
+                <div key={b.creditTx} className="divide-y">
+                  <TxLink label={`${b.via === "x402" ? "x402 payment" : b.via === "transfer" ? "USDC transfer" : "Payment"} · ${formatUsdc(b.amountUsdc)} from ${shortAddress(b.backer)}`} hash={b.txHash} />
+                  <TxLink label="Credited by Swappy" hash={b.creditTx} />
+                </div>
+              ))}
               {promise.settlement?.txHash && <TxLink label={promise.settlement.outcome === "refund" ? "Refunded" : "Paid out"} hash={promise.settlement.txHash} />}
             </div>
           </section>

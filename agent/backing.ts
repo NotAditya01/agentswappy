@@ -13,7 +13,7 @@ export class BackingError extends Error {
 }
 
 // The backer already sent USDC to the escrow. The agent checks that transfer and credits it to the promise.
-export async function creditWalletBacking(promiseId: string, txHash: string): Promise<PromiseRecord> {
+export async function creditWalletBacking(promiseId: string, txHash: string, via: "x402" | "transfer" = "transfer"): Promise<PromiseRecord> {
   const escrow = ESCROW_ADDRESS;
   const key = process.env.WALLET_PRIVATE_KEY;
   if (!escrow || !key) throw new BackingError("The escrow is not configured on this server.");
@@ -57,7 +57,7 @@ export async function creditWalletBacking(promiseId: string, txHash: string): Pr
   const credited = await client.waitForTransactionReceipt({ hash: creditTx });
   if (credited.status !== "success") throw new BackingError(`Crediting the backing reverted. Tx ${creditTx}`, 502);
 
-  const backing = { backer: sent.from, amountUsdc: formatUnits(sent.value, 6), txHash, creditTx, at: new Date().toISOString() };
+  const backing = { backer: sent.from, amountUsdc: formatUnits(sent.value, 6), txHash, creditTx, at: new Date().toISOString(), via };
   const saved = await savePromise(promiseId, { backings: [...(promise.backings ?? []), backing] });
   return saved ?? promise;
 }
