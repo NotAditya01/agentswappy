@@ -6,7 +6,7 @@
 
 Stake USDC on a personal promise. Swappy checks your proof (GitHub commits or a photo, including workout screenshots from any fitness app) and decides whether you get the stake back or it goes to a friend or charity.
 
-**Live:** https://proof-of-promise.vercel.app · **Week 2 demo:** [YouTube](https://youtu.be/mULHLHCVfV4)  · **Week 3 demo:** [YouTube](https://youtu.be/VQLjkb55qJA)
+**Live:** https://proof-of-promise.vercel.app · **Week 2 demo:** [YouTube](https://youtu.be/mULHLHCVfV4)  · **Week 3 demo:** [YouTube](https://youtu.be/S5K-yR6ZCfI)
 
 ## The problem
 
@@ -196,7 +196,7 @@ Past deadlines are allowed, so a GitHub window that already ended can be checked
 
 Week 1 (proofofpromise.v1): not submitted (joined at Week 2)  
 Week 2 (proofofpromise.v2): https://youtu.be/mULHLHCVfV4  
-Week 3 (proofofpromise.v3): https://youtu.be/VQLjkb55qJA
+Week 3 (proofofpromise.v3): https://youtu.be/S5K-yR6ZCfI
 
 Live: https://proof-of-promise.vercel.app
 
